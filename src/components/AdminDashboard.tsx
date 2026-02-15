@@ -23,10 +23,14 @@ export const AdminDashboard: React.FC = () => {
   const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
   const [quizQuestions, setQuizQuestions] = useState<Question[]>([]);
   
+  // Edit States
+  const [editingUser, setEditingUser] = useState<QuizUser | null>(null);
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  
   // Modals
-  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [showUserModal, setShowUserModal] = useState(false);
   const [showCreateQuizModal, setShowCreateQuizModal] = useState(false);
-  const [showAddQuestionModal, setShowAddQuestionModal] = useState(false);
+  const [showQuestionModal, setShowQuestionModal] = useState(false);
   
   // Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -42,10 +46,10 @@ export const AdminDashboard: React.FC = () => {
   });
 
   // Form Data
-  const [newUser, setNewUser] = useState({ name: '', employeeId: '', department: '' });
+  const [userData, setUserData] = useState({ name: '', employeeId: '', department: '' });
   const [newQuizTitle, setNewQuizTitle] = useState('');
   const [newQuizActive, setNewQuizActive] = useState(false);
-  const [newQuestion, setNewQuestion] = useState<Omit<Question, 'id' | 'order'>>({
+  const [questionData, setQuestionData] = useState<Omit<Question, 'id' | 'order'>>({
     text: '',
     options: { A: '', B: '', C: '', D: '' },
     correctAnswer: 'A'
@@ -84,20 +88,42 @@ export const AdminDashboard: React.FC = () => {
   };
 
   // --- STAFF ACTIONS ---
-  const handleAddUser = async (e: React.FormEvent) => {
+  const openAddUserModal = () => {
+    setEditingUser(null);
+    setUserData({ name: '', employeeId: '', department: '' });
+    setShowUserModal(true);
+  };
+
+  const openEditUserModal = (u: QuizUser) => {
+    setEditingUser(u);
+    setUserData({ name: u.name, employeeId: u.employeeId, department: u.department });
+    setShowUserModal(true);
+  };
+
+  const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await db.collection('users').add({
-        ...newUser,
-        role: 'employee',
-        participations: {}
-      });
-      setShowAddUserModal(false);
-      setNewUser({ name: '', employeeId: '', department: '' });
+      if (editingUser) {
+        // Edit existing
+        await db.collection('users').doc(editingUser.id).update({
+          name: userData.name,
+          employeeId: userData.employeeId,
+          department: userData.department
+        });
+      } else {
+        // Create new
+        await db.collection('users').add({
+          ...userData,
+          role: 'employee',
+          participations: {}
+        });
+      }
+      setShowUserModal(false);
+      setUserData({ name: '', employeeId: '', department: '' });
       await fetchUsers();
     } catch (error) {
-      alert("Error adding user");
+      alert("Error saving user");
     } finally {
       setLoading(false);
     }
@@ -200,20 +226,48 @@ export const AdminDashboard: React.FC = () => {
   };
 
   // --- QUESTION ACTIONS (Inside Quiz) ---
-  const handleAddQuestion = async (e: React.FormEvent) => {
+  const openAddQuestionModal = () => {
+    setEditingQuestion(null);
+    setQuestionData({
+      text: '',
+      options: { A: '', B: '', C: '', D: '' },
+      correctAnswer: 'A'
+    });
+    setShowQuestionModal(true);
+  };
+
+  const openEditQuestionModal = (q: Question) => {
+    setEditingQuestion(q);
+    setQuestionData({
+      text: q.text,
+      options: { ...q.options },
+      correctAnswer: q.correctAnswer
+    });
+    setShowQuestionModal(true);
+  };
+
+  const handleSaveQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedQuiz) return;
     try {
-      const order = quizQuestions.length + 1;
-      await db.collection('quizzes').doc(selectedQuiz.id).collection('questions').add({
-        ...newQuestion,
-        order
-      });
-      setShowAddQuestionModal(false);
-      setNewQuestion({ text: '', options: { A: '', B: '', C: '', D: '' }, correctAnswer: 'A' });
+      if (editingQuestion) {
+         // Update existing
+         await db.collection('quizzes').doc(selectedQuiz.id).collection('questions').doc(editingQuestion.id).update({
+           ...questionData
+         });
+      } else {
+         // Create new
+         const order = quizQuestions.length + 1;
+         await db.collection('quizzes').doc(selectedQuiz.id).collection('questions').add({
+           ...questionData,
+           order
+         });
+      }
+      setShowQuestionModal(false);
+      setQuestionData({ text: '', options: { A: '', B: '', C: '', D: '' }, correctAnswer: 'A' });
       await fetchQuestions(selectedQuiz.id);
     } catch (error) {
-      alert("Error adding question");
+      alert("Error saving question");
     }
   };
 
@@ -459,7 +513,7 @@ export const AdminDashboard: React.FC = () => {
                         <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleQuestionImport} />
                       </label>
                       <button 
-                        onClick={() => setShowAddQuestionModal(true)}
+                        onClick={openAddQuestionModal}
                         className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors shadow-lg shadow-indigo-500/20"
                       >
                         <Plus className="w-4 h-4" /> Add Question
@@ -478,11 +532,11 @@ export const AdminDashboard: React.FC = () => {
                       </div>
                     ) : (
                       quizQuestions.map((q) => (
-                        <div key={q.id} className="p-5 hover:bg-white hover:shadow-sm transition-all flex gap-5 group border-l-4 border-transparent hover:border-indigo-500">
+                        <div key={q.id} className="p-5 hover:bg-white hover:shadow-sm transition-all flex gap-5 group border-l-4 border-transparent hover:border-indigo-500 relative">
                           <div className="flex-shrink-0 w-10 h-10 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-sm font-bold text-slate-500 shadow-sm">
                             {q.order}
                           </div>
-                          <div className="flex-1">
+                          <div className="flex-1 pr-16">
                             <p className="font-semibold text-slate-800 mb-3 text-lg">{q.text}</p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                               {Object.entries(q.options).map(([key, val]) => (
@@ -493,18 +547,33 @@ export const AdminDashboard: React.FC = () => {
                               ))}
                             </div>
                           </div>
-                          <button 
-                            type="button"
-                            onClick={(e) => { 
-                              e.preventDefault();
-                              e.stopPropagation(); 
-                              handleDeleteQuestion(q.id); 
-                            }} 
-                            className="text-slate-300 hover:text-red-500 self-start p-2 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
-                            title="Delete Question"
-                          >
-                            <Trash2 className="w-5 h-5 pointer-events-none" />
-                          </button>
+                          
+                          <div className="absolute top-5 right-5 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                openEditQuestionModal(q);
+                              }}
+                              className="text-slate-400 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                              title="Edit Question"
+                            >
+                              <Edit2 className="w-5 h-5" />
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={(e) => { 
+                                e.preventDefault();
+                                e.stopPropagation(); 
+                                handleDeleteQuestion(q.id); 
+                              }} 
+                              className="text-slate-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                              title="Delete Question"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
                         </div>
                       ))
                     )}
@@ -533,7 +602,7 @@ export const AdminDashboard: React.FC = () => {
                   <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleUserImport} />
                 </label>
                 <button 
-                  onClick={() => setShowAddUserModal(true)}
+                  onClick={openAddUserModal}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors shadow-md shadow-blue-500/20"
                 >
                   <Plus className="w-4 h-4" /> Add Staff
@@ -552,7 +621,7 @@ export const AdminDashboard: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-100">
                   {users.map((u) => (
-                    <tr key={u.id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={u.id} className="hover:bg-slate-50 transition-colors group">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 font-mono">{u.employeeId}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">{u.name.charAt(0)}</div>
@@ -564,14 +633,27 @@ export const AdminDashboard: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button 
                           type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openEditUserModal(u);
+                          }}
+                          className="text-slate-300 hover:text-blue-600 transition-colors p-2 rounded-lg hover:bg-blue-50 mr-1"
+                          title="Edit Staff"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          type="button"
                           onClick={(e) => { 
                             e.preventDefault();
                             e.stopPropagation(); 
                             handleDeleteUser(u.id); 
                           }} 
                           className="text-slate-300 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50"
+                          title="Delete Staff"
                         >
-                          <Trash2 className="w-4 h-4 pointer-events-none" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </td>
                     </tr>
@@ -596,7 +678,7 @@ export const AdminDashboard: React.FC = () => {
                   <select 
                     value={reportQuizId} 
                     onChange={(e) => setReportQuizId(e.target.value)}
-                    className="w-full md:w-80 border-slate-200 rounded-xl shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 pl-3 pr-10 bg-slate-50 hover:bg-white transition-colors cursor-pointer"
+                    className="w-full md:w-80 border-slate-200 rounded-xl shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 pl-3 pr-10 bg-white hover:bg-slate-50 transition-colors cursor-pointer text-slate-800"
                   >
                     {quizzes.length === 0 && <option>No Quizzes Available</option>}
                     {quizzes.map(q => <option key={q.id} value={q.id}>{q.title}</option>)}
@@ -735,7 +817,7 @@ export const AdminDashboard: React.FC = () => {
                  <input 
                    autoFocus 
                    type="text" 
-                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-800" 
+                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-800 bg-white" 
                    placeholder="e.g. Safety Protocols 2024"
                    value={newQuizTitle} 
                    onChange={e => setNewQuizTitle(e.target.value)} 
@@ -749,7 +831,7 @@ export const AdminDashboard: React.FC = () => {
                     id="newQuizActive"
                     checked={newQuizActive}
                     onChange={(e) => setNewQuizActive(e.target.checked)}
-                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300"
+                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300 bg-white"
                  />
                  <label htmlFor="newQuizActive" className="text-sm text-slate-700 font-medium cursor-pointer select-none">Make active immediately</label>
                </div>
@@ -763,54 +845,54 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Add User Modal */}
-      {showAddUserModal && (
+      {/* Add/Edit User Modal */}
+      {showUserModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in slide-in-from-bottom-8">
              <div className="flex justify-between items-center mb-6">
-               <h3 className="text-xl font-bold text-slate-800">Add Staff Member</h3>
-               <button onClick={() => setShowAddUserModal(false)} className="p-1 hover:bg-slate-100 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
+               <h3 className="text-xl font-bold text-slate-800">{editingUser ? 'Edit Staff Member' : 'Add Staff Member'}</h3>
+               <button onClick={() => setShowUserModal(false)} className="p-1 hover:bg-slate-100 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
              </div>
-             <form onSubmit={handleAddUser} className="space-y-4">
+             <form onSubmit={handleSaveUser} className="space-y-4">
                <div>
                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Full Name</label>
-                 <input type="text" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="John Doe" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} required />
+                 <input type="text" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 bg-white" placeholder="John Doe" value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} required />
                </div>
                <div>
                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Employee ID</label>
-                 <input type="text" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="EMP-001" value={newUser.employeeId} onChange={e => setNewUser({...newUser, employeeId: e.target.value})} required />
+                 <input type="text" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 bg-white" placeholder="EMP-001" value={userData.employeeId} onChange={e => setUserData({...userData, employeeId: e.target.value})} required />
                </div>
                <div>
                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Department</label>
-                 <input type="text" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="IT Dept" value={newUser.department} onChange={e => setNewUser({...newUser, department: e.target.value})} required />
+                 <input type="text" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 bg-white" placeholder="IT Dept" value={userData.department} onChange={e => setUserData({...userData, department: e.target.value})} required />
                </div>
                <div className="flex justify-end gap-3 mt-8">
-                 <button type="button" onClick={() => setShowAddUserModal(false)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition-colors">Cancel</button>
-                 <button type="submit" className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-lg shadow-blue-500/20">Add Staff</button>
+                 <button type="button" onClick={() => setShowUserModal(false)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition-colors">Cancel</button>
+                 <button type="submit" className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-lg shadow-blue-500/20">{editingUser ? 'Save Changes' : 'Add Staff'}</button>
                </div>
              </form>
            </div>
         </div>
       )}
 
-      {/* Add Question Modal */}
-      {showAddQuestionModal && (
+      {/* Add/Edit Question Modal */}
+      {showQuestionModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 my-8 animate-in zoom-in-95">
              <div className="flex justify-between items-center mb-6">
-               <h3 className="text-xl font-bold text-slate-800">Add Question</h3>
-               <button onClick={() => setShowAddQuestionModal(false)} className="p-1 hover:bg-slate-100 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
+               <h3 className="text-xl font-bold text-slate-800">{editingQuestion ? 'Edit Question' : 'Add Question'}</h3>
+               <button onClick={() => setShowQuestionModal(false)} className="p-1 hover:bg-slate-100 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
              </div>
-             <form onSubmit={handleAddQuestion} className="space-y-5">
+             <form onSubmit={handleSaveQuestion} className="space-y-5">
                <div>
                  <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Question Text</label>
-                 <textarea className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" rows={3} placeholder="What is the..." value={newQuestion.text} onChange={e => setNewQuestion({...newQuestion, text: e.target.value})} required />
+                 <textarea className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 bg-white" rows={3} placeholder="What is the..." value={questionData.text} onChange={e => setQuestionData({...questionData, text: e.target.value})} required />
                </div>
                <div className="grid grid-cols-1 gap-4">
                   {(['A', 'B', 'C', 'D'] as const).map(opt => (
                     <div key={opt} className="relative">
                       <span className="absolute left-4 top-3.5 text-xs font-bold text-slate-400">Option {opt}</span>
-                      <input type="text" className="w-full pl-20 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium" value={newQuestion.options[opt]} onChange={e => setNewQuestion({...newQuestion, options: {...newQuestion.options, [opt]: e.target.value}})} required />
+                      <input type="text" className="w-full pl-20 pr-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium text-slate-900 bg-white" value={questionData.options[opt]} onChange={e => setQuestionData({...questionData, options: {...questionData.options, [opt]: e.target.value}})} required />
                     </div>
                   ))}
                </div>
@@ -821,8 +903,8 @@ export const AdminDashboard: React.FC = () => {
                      <button
                         type="button"
                         key={opt}
-                        onClick={() => setNewQuestion({...newQuestion, correctAnswer: opt})}
-                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${newQuestion.correctAnswer === opt ? 'bg-green-500 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+                        onClick={() => setQuestionData({...questionData, correctAnswer: opt})}
+                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${questionData.correctAnswer === opt ? 'bg-green-500 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
                      >
                        {opt}
                      </button>
@@ -830,8 +912,8 @@ export const AdminDashboard: React.FC = () => {
                  </div>
                </div>
                <div className="flex justify-end gap-3 mt-6">
-                 <button type="button" onClick={() => setShowAddQuestionModal(false)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition-colors">Cancel</button>
-                 <button type="submit" className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-lg shadow-blue-500/20">Save Question</button>
+                 <button type="button" onClick={() => setShowQuestionModal(false)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition-colors">Cancel</button>
+                 <button type="submit" className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-lg shadow-blue-500/20">{editingQuestion ? 'Save Changes' : 'Save Question'}</button>
                </div>
              </form>
            </div>
