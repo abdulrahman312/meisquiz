@@ -63,19 +63,25 @@ export const EmployeeDashboard: React.FC = () => {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <header className="bg-white shadow-sm sticky top-0 z-30 border-b border-blue-50">
         <div className="max-w-5xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 md:gap-3 flex-shrink min-w-0">
                {selectedQuiz ? (
-                 <button onClick={() => setSelectedQuiz(null)} className={`p-2 ${isRTL ? '-mr-2' : '-ml-2'} text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all`}><BackIcon className="w-6 h-6" /></button>
+                 <button onClick={() => setSelectedQuiz(null)} className={`p-2 ${isRTL ? '-mr-2' : '-ml-2'} text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all flex-shrink-0`}><BackIcon className="w-5 h-5 md:w-6 md:h-6" /></button>
                ) : (
-                 <img src="https://i.ibb.co/bgFrgXkW/meis.png" alt="Logo" className="w-10 h-10 md:w-14 md:h-14" />
+                 <img src="https://i.ibb.co/bgFrgXkW/meis.png" alt="Logo" className="w-9 h-9 md:w-14 md:h-14 flex-shrink-0" />
                )}
-               <div className="flex flex-col">
-                 <h1 className="text-blue-700 font-bold font-arabic text-[11px] md:text-lg leading-tight">{t('schoolNameAr')}</h1>
-                 <h2 className="text-blue-500 font-semibold text-[10px] md:text-sm leading-tight tracking-tight">{t('schoolNameEn')}</h2>
+               <div className="flex flex-col min-w-0">
+                 <h1 className="text-blue-700 font-bold font-arabic text-[9px] md:text-lg leading-tight truncate">{t('schoolNameAr')}</h1>
+                 <h2 className="text-blue-500 font-semibold text-[8px] md:text-sm leading-tight tracking-tight truncate">{t('schoolNameEn')}</h2>
                </div>
             </div>
-            <button onClick={() => logout()} className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"><LogOut className="w-5 h-5" /></button>
+            <button 
+              onClick={() => logout()} 
+              className="flex items-center gap-1.5 p-2 md:px-3 md:py-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100 flex-shrink-0"
+            >
+              <LogOut className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="text-[10px] md:text-xs font-bold uppercase">{t('logout')}</span>
+            </button>
           </div>
         </div>
       </header>

@@ -307,7 +307,6 @@ export const AdminDashboard: React.FC = () => {
     });
   };
 
-  // --- HELPERS FOR MODALS ---
   const openAddUserModal = () => {
     setEditingUser(null);
     setUserData({ name: '', employeeId: '', department: '' });
@@ -368,7 +367,6 @@ export const AdminDashboard: React.FC = () => {
          else if (percentage <= 60) scoreDistribution[2].count++;
          else if (percentage <= 80) scoreDistribution[3].count++;
          else scoreDistribution[4].count++;
-         // Fix line 351: Specify type for entries to avoid 'unknown' error
          Object.entries(p.answers).forEach(([qId, ans]: [string, any]) => {
             if (!questionAnalysis[qId]) questionAnalysis[qId] = { correct: 0, total: 0 };
             questionAnalysis[qId].total++;
@@ -428,22 +426,23 @@ export const AdminDashboard: React.FC = () => {
       <header className="bg-white shadow-sm sticky top-0 z-30 border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Top Header Row - Branding & Logout */}
-          <div className="flex items-center justify-between py-3 md:py-4">
-            <div className="flex items-center gap-3">
-              <img src="https://i.ibb.co/bgFrgXkW/meis.png" alt="Logo" className="w-10 h-10 md:w-12 md:h-12" />
-              <div className="flex flex-col">
-                <h1 className="text-blue-800 font-bold font-arabic text-[10px] md:text-sm leading-tight">{t('schoolNameAr')}</h1>
-                <h2 className="text-blue-600 font-medium text-[9px] md:text-xs leading-tight">{t('schoolNameEn')}</h2>
+          <div className="flex items-center justify-between py-3 md:py-4 gap-2">
+            <div className="flex items-center gap-2 md:gap-3 flex-shrink min-w-0">
+              <img src="https://i.ibb.co/bgFrgXkW/meis.png" alt="Logo" className="w-9 h-9 md:w-12 md:h-12 flex-shrink-0" />
+              <div className="flex flex-col min-w-0">
+                <h1 className="text-blue-800 font-bold font-arabic text-[9px] md:text-sm leading-tight truncate">{t('schoolNameAr')}</h1>
+                <h2 className="text-blue-600 font-medium text-[8px] md:text-xs leading-tight truncate">{t('schoolNameEn')}</h2>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="hidden sm:block text-slate-400 font-bold text-[10px] tracking-wider uppercase">{t('adminPortal')}</span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <span className="hidden lg:block text-slate-400 font-bold text-[10px] tracking-wider uppercase">{t('adminPortal')}</span>
               <button 
                 onClick={() => logout()} 
-                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" 
+                className="flex items-center gap-1.5 px-3 py-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100" 
                 title={t('logout')}
               >
-                <LogOut className="w-5 h-5" />
+                <LogOut className="w-4 h-4 md:w-5 md:h-5" />
+                <span className="text-[10px] md:text-xs font-bold uppercase">{t('logout')}</span>
               </button>
             </div>
           </div>
@@ -532,7 +531,7 @@ export const AdminDashboard: React.FC = () => {
                     </div>
                     <div className="flex flex-wrap gap-2 md:gap-3">
                       <button onClick={downloadQuestionTemplate} className="flex-1 md:flex-none justify-center bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg flex items-center gap-2 text-xs md:text-sm font-medium transition-colors"><Download className="w-4 h-4" /> {t('template')}</button>
-                      <label className="flex-1 md:flex-none justify-center bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg cursor-pointer flex items-center gap-2 text-xs md:text-sm font-medium transition-colors"><Upload className="w-4 h-4" /> {t('import')}<input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleQuestionImport} /></label>
+                      <label className="flex-1 md:flex-none justify-center bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg cursor-pointer flex items-center justify-center gap-2 text-xs md:text-sm font-medium transition-colors"><Upload className="w-4 h-4" /> {t('import')}<input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleQuestionImport} /></label>
                       <button onClick={openAddQuestionModal} className="w-full xl:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-medium transition-colors shadow-lg shadow-indigo-500/20"><Plus className="w-4 h-4" /> {t('addQuestion')}</button>
                     </div>
                   </div>
