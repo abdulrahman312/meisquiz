@@ -6,7 +6,7 @@ import { db } from '../firebase';
 import firebase from "firebase/compat/app";
 import { 
   Users, FileSpreadsheet, LogOut, Upload, Trash2, Plus, 
-  ChevronRight, ArrowLeft, ArrowRight, MoreVertical, Edit2, PlayCircle, StopCircle, Save, X, Eye, Download, AlertTriangle, LayoutDashboard, CheckSquare, BarChart2, PieChart as PieChartIcon, RotateCcw
+  ChevronRight, ArrowLeft, ArrowRight, MoreVertical, Edit2, PlayCircle, StopCircle, Save, X, Eye, Download, AlertTriangle, LayoutDashboard, CheckSquare, BarChart2, PieChart as PieChartIcon, RotateCcw, Check
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import { parseUsersExcel, parseQuestionsExcel, exportReportsToExcel, downloadUserTemplate, downloadQuestionTemplate } from '../services/excelService';
@@ -32,6 +32,8 @@ export const AdminDashboard: React.FC = () => {
   // Edit States
   const [editingUser, setEditingUser] = useState<QuizUser | null>(null);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editTitleValue, setEditTitleValue] = useState('');
   
   // Modals
   const [showUserModal, setShowUserModal] = useState(false);
@@ -221,6 +223,23 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleUpdateTitle = async () => {
+    if (!selectedQuiz || !editTitleValue.trim()) return;
+    try {
+      await db.collection('quizzes').doc(selectedQuiz.id).update({
+        title: editTitleValue
+      });
+      
+      const updated = { ...selectedQuiz, title: editTitleValue };
+      setSelectedQuiz(updated);
+      setQuizzes(prev => prev.map(q => q.id === updated.id ? updated : q));
+      setIsEditingTitle(false);
+    } catch (error) {
+      console.error("Error updating title:", error);
+      alert("Failed to update title");
+    }
+  };
+
   const handleDeleteQuiz = (id: string) => {
     setConfirmModal({
       isOpen: true,
@@ -242,6 +261,7 @@ export const AdminDashboard: React.FC = () => {
 
   const selectQuiz = async (quiz: Quiz) => {
     setSelectedQuiz(quiz);
+    setIsEditingTitle(false);
     await fetchQuestions(quiz.id);
   };
 
@@ -625,7 +645,38 @@ export const AdminDashboard: React.FC = () => {
                   {/* Detail Header */}
                   <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row md:justify-between md:items-center gap-6">
                     <div>
-                      <h2 className="text-2xl font-bold text-slate-900">{selectedQuiz.title}</h2>
+                      {isEditingTitle ? (
+                        <div className="flex items-center gap-2 mb-1">
+                          <input 
+                            type="text" 
+                            value={editTitleValue}
+                            onChange={(e) => setEditTitleValue(e.target.value)}
+                            className="text-2xl font-bold text-slate-900 border-b-2 border-blue-500 focus:outline-none bg-transparent px-1 w-full md:w-auto min-w-[300px]"
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleUpdateTitle();
+                              if (e.key === 'Escape') setIsEditingTitle(false);
+                            }}
+                          />
+                          <button onClick={handleUpdateTitle} className="p-1.5 text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors" title={t('save')}>
+                            <Check className="w-5 h-5" />
+                          </button>
+                          <button onClick={() => setIsEditingTitle(false)} className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors" title={t('cancel')}>
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-3 group mb-1">
+                          <h2 className="text-2xl font-bold text-slate-900">{selectedQuiz.title}</h2>
+                          <button 
+                            onClick={() => { setEditTitleValue(selectedQuiz.title); setIsEditingTitle(true); }}
+                            className="text-slate-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-all p-1 rounded-md hover:bg-slate-100"
+                            title={t('edit')}
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                       <div className="flex items-center gap-3 mt-2">
                         <span className="text-sm font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{formatNumber(quizQuestions.length)} {t('questionsCount')}</span>
                         <span className={`text-sm font-bold flex items-center gap-1.5 ${selectedQuiz.isActive ? 'text-green-600' : 'text-slate-400'}`}>
