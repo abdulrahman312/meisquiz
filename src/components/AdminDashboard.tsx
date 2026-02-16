@@ -637,7 +637,7 @@ export const AdminDashboard: React.FC = () => {
               </div>
               <button onClick={handleExportReport} disabled={!reportStats} className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all shadow-lg shadow-green-500/20 disabled:opacity-50"><FileSpreadsheet className="w-5 h-5" /> {t('downloadReport')}</button>
             </div>
-            {reportStats && (
+            {reportStats ? (
               <div className="space-y-6">
                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <ReportCard title={t('participation')} value={formatNumber(reportStats.totalCompleted)} subtitle={t('staffCompleted')} color="indigo" />
