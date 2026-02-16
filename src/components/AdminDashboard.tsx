@@ -672,12 +672,14 @@ export const AdminDashboard: React.FC = () => {
                           <div className={`flex-1 ${isRTL ? 'pl-16' : 'pr-16'}`}>
                             <p className="font-semibold text-slate-800 mb-3 text-lg">{q.text}</p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                              {Object.entries(q.options).map(([key, val]) => (
+                              {(['A', 'B', 'C', 'D'] as const).map((key) => {
+                                const val = q.options[key];
+                                return (
                                 <div key={key} className={`px-3 py-2 rounded-lg flex items-center gap-3 border ${key === q.correctAnswer ? 'bg-green-50 border-green-200 text-green-800 font-medium' : 'bg-white border-slate-100 text-slate-500'}`}>
                                   <span className={`w-6 h-6 rounded flex items-center justify-center text-xs border ${key === q.correctAnswer ? 'border-green-300 bg-white' : 'border-slate-200 bg-slate-50'}`}>{key}</span>
                                   <span>{val}</span>
                                 </div>
-                              ))}
+                              )})}
                             </div>
                           </div>
                           
