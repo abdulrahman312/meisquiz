@@ -1,11 +1,14 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { db } from '../firebase';
+import firebase from "firebase/compat/app";
 import { 
   Users, FileSpreadsheet, LogOut, Upload, Trash2, Plus, 
-  ChevronRight, ArrowLeft, ArrowRight, MoreVertical, Edit2, PlayCircle, StopCircle, Save, X, Eye, Download, AlertTriangle, LayoutDashboard, CheckSquare
+  ChevronRight, ArrowLeft, ArrowRight, MoreVertical, Edit2, PlayCircle, StopCircle, Save, X, Eye, Download, AlertTriangle, LayoutDashboard, CheckSquare, BarChart2, PieChart as PieChartIcon, RotateCcw
 } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import { parseUsersExcel, parseQuestionsExcel, exportReportsToExcel, downloadUserTemplate, downloadQuestionTemplate } from '../services/excelService';
 import { QuizUser, Question, Quiz } from '../types';
 import { Footer } from './Footer';
@@ -60,12 +63,26 @@ export const AdminDashboard: React.FC = () => {
 
   // Reporting State
   const [reportQuizId, setReportQuizId] = useState<string>('');
+  // We need to fetch questions for reports to show question analysis text
+  const [reportQuestions, setReportQuestions] = useState<Question[]>([]);
 
   // --- INITIAL DATA FETCH ---
   useEffect(() => {
     fetchUsers();
     fetchQuizzes();
   }, []);
+
+  // Fetch questions when opening report tab
+  useEffect(() => {
+    if (activeTab === 'reports' && reportQuizId) {
+        // Reuse fetch logic but store in separate state so we don't confuse the "Edit Quiz" view
+        const loadReportQs = async () => {
+            const snap = await db.collection('quizzes').doc(reportQuizId).collection('questions').orderBy('order').get();
+            setReportQuestions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Question)));
+        };
+        loadReportQs();
+    }
+  }, [activeTab, reportQuizId]);
 
   const fetchUsers = async () => {
     const snap = await db.collection('users').get();
@@ -320,38 +337,109 @@ export const AdminDashboard: React.FC = () => {
     });
   };
 
-  // --- REPORT GENERATION ---
-  const getReportStats = () => {
+  // --- REPORT GENERATION & ANALYTICS ---
+  const reportStats = useMemo(() => {
     if (!reportQuizId) return null;
-    const allParticipants = users.filter(u => u.participations && u.participations[reportQuizId]);
     
-    // Filter fully completed (Answered all questions)
+    // 1. Filter Participants
+    const allParticipants = users.filter(u => u.participations && u.participations[reportQuizId]);
     const fullyCompletedUsers = allParticipants.filter(u => {
         const p = u.participations![reportQuizId];
-        // If totalQuestions is recorded, check if answers match
         return p.answers && p.totalQuestions && Object.keys(p.answers).length === p.totalQuestions;
     });
 
     const totalCompleted = fullyCompletedUsers.length;
-    
     let totalScore = 0;
     let maxScorePossible = 0; 
-    
+    let passedCount = 0;
+
+    // 2. Department & Score Stats
+    const deptStats: { [dept: string]: { totalScore: number, count: number } } = {};
+    const scoreDistribution = [
+        { name: '0-20%', count: 0, fill: '#ef4444' }, 
+        { name: '21-40%', count: 0, fill: '#f97316' }, 
+        { name: '41-60%', count: 0, fill: '#eab308' }, 
+        { name: '61-80%', count: 0, fill: '#84cc16' }, 
+        { name: '81-100%', count: 0, fill: '#22c55e' }
+    ];
+
+    // 3. Question Analysis Stats
+    const questionAnalysis: { [qId: string]: { correct: number, total: number } } = {};
+
     if (fullyCompletedUsers.length > 0) {
        maxScorePossible = fullyCompletedUsers[0].participations![reportQuizId].totalQuestions;
+       
        fullyCompletedUsers.forEach(u => {
-         totalScore += u.participations![reportQuizId].score;
+         const p = u.participations![reportQuizId];
+         const percentage = (p.score / p.totalQuestions) * 100;
+         
+         // Aggregate Total Score
+         totalScore += p.score;
+         
+         // Aggregate Pass (assuming 50%)
+         if (percentage >= 50) passedCount++;
+
+         // Aggregate Department Stats
+         const dept = u.department || 'Unknown';
+         if (!deptStats[dept]) deptStats[dept] = { totalScore: 0, count: 0 };
+         deptStats[dept].totalScore += percentage;
+         deptStats[dept].count++;
+
+         // Aggregate Score Dist
+         if (percentage <= 20) scoreDistribution[0].count++;
+         else if (percentage <= 40) scoreDistribution[1].count++;
+         else if (percentage <= 60) scoreDistribution[2].count++;
+         else if (percentage <= 80) scoreDistribution[3].count++;
+         else scoreDistribution[4].count++;
+
+         // Aggregate Question Stats
+         Object.entries(p.answers).forEach(([qId, ans]) => {
+            if (!questionAnalysis[qId]) questionAnalysis[qId] = { correct: 0, total: 0 };
+            questionAnalysis[qId].total++;
+            if (ans.isCorrect) questionAnalysis[qId].correct++;
+         });
        });
     }
 
     const avgScore = totalCompleted > 0 && maxScorePossible > 0
       ? Math.round((totalScore / (totalCompleted * maxScorePossible)) * 100) 
       : 0;
+    
+    const passRate = totalCompleted > 0 ? Math.round((passedCount / totalCompleted) * 100) : 0;
 
-    return { totalCompleted, avgScore, allParticipants, maxScorePossible };
-  };
+    // Format Dept Chart Data
+    const deptChartData = Object.entries(deptStats).map(([name, data]) => ({
+        name,
+        avg: Math.round(data.totalScore / data.count),
+        count: data.count
+    })).sort((a,b) => b.avg - a.avg);
 
-  const reportStats = getReportStats();
+    // Identify Top Department
+    const topDept = deptChartData.length > 0 ? deptChartData[0].name : '-';
+
+    // Format Question Analysis
+    const questionAnalysisData = reportQuestions.map(q => {
+        const stats = questionAnalysis[q.id] || { correct: 0, total: 0 };
+        const rate = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
+        return {
+            ...q,
+            correctRate: rate,
+            attempts: stats.total
+        };
+    }).sort((a,b) => a.correctRate - b.correctRate); // Sort by hardest first
+
+    return { 
+        totalCompleted, 
+        avgScore, 
+        passRate,
+        topDept,
+        allParticipants, 
+        maxScorePossible,
+        scoreDistribution,
+        deptChartData,
+        questionAnalysisData
+    };
+  }, [users, reportQuizId, reportQuestions]);
 
   const handleExportReport = () => {
     if (!reportStats) return;
@@ -369,6 +457,37 @@ export const AdminDashboard: React.FC = () => {
       };
     });
     exportReportsToExcel(data, 'Quiz_Report');
+  };
+
+  const handleResetProgress = (userId: string) => {
+    setConfirmModal({
+        isOpen: true,
+        title: t('resetConfirmTitle'),
+        message: t('resetConfirmMsg'),
+        onConfirm: async () => {
+            try {
+                // Delete the specific quiz participation key from the user document
+                await db.collection('users').doc(userId).update({
+                    [`participations.${reportQuizId}`]: firebase.firestore.FieldValue.delete()
+                });
+
+                // Optimistic UI update
+                setUsers(prev => prev.map(u => {
+                    if (u.id === userId && u.participations) {
+                        const newParts = { ...u.participations };
+                        delete newParts[reportQuizId];
+                        return { ...u, participations: newParts };
+                    }
+                    return u;
+                }));
+
+                setConfirmModal(prev => ({ ...prev, isOpen: false }));
+            } catch (error) {
+                console.error("Error resetting progress:", error);
+                alert("Failed to reset progress.");
+            }
+        }
+    });
   };
 
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
@@ -408,11 +527,6 @@ export const AdminDashboard: React.FC = () => {
                 <LogOut className="w-5 h-5" />
               </button>
             </div>
-            
-            {/* Mobile Logout (optional, or just rely on nav logic if needed later, currently hidden on mobile unless we add it back) */}
-             <div className={`md:hidden absolute top-4 ${isRTL ? 'left-4' : 'right-4'}`}>
-                <button onClick={() => logout()} className="p-2 text-slate-400 hover:text-red-600" title={t('logout')}><LogOut className="w-5 h-5" /></button>
-             </div>
           </div>
         </div>
       </header>
@@ -716,31 +830,140 @@ export const AdminDashboard: React.FC = () => {
             </div>
 
             {reportStats ? (
-              <div className="grid gap-6 md:grid-cols-2">
-                 {/* Stat Cards */}
-                 <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-2xl shadow-lg text-white relative overflow-hidden">
-                    <div className="relative z-10">
-                      <h3 className="text-indigo-100 text-sm font-semibold uppercase tracking-wider">{t('participation')}</h3>
-                      <div className="mt-2 flex items-baseline gap-2">
-                        <span className="text-4xl font-bold">{formatNumber(reportStats.totalCompleted)}</span>
-                        <span className="text-sm text-indigo-200">{t('staffCompleted')}</span>
-                      </div>
-                    </div>
-                    <div className={`absolute ${isRTL ? 'left-0' : 'right-0'} bottom-0 w-32 h-32 bg-white/10 rounded-full blur-2xl ${isRTL ? '-ml-6' : '-mr-6'} -mb-6`}></div>
+              <div className="space-y-6">
+                 {/* Row 1: KPI Cards */}
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <ReportCard 
+                        title={t('participation')} 
+                        value={formatNumber(reportStats.totalCompleted)} 
+                        subtitle={t('staffCompleted')} 
+                        color="indigo" 
+                    />
+                    <ReportCard 
+                        title={t('avgPerformance')} 
+                        value={`${formatNumber(reportStats.avgScore)}%`} 
+                        subtitle={t('avgScore')} 
+                        color="blue" 
+                    />
+                    <ReportCard 
+                        title={t('passRate')} 
+                        value={`${formatNumber(reportStats.passRate)}%`} 
+                        subtitle={"> 50%"} 
+                        color="green" 
+                    />
+                    <ReportCard 
+                        title={t('topDept')} 
+                        value={reportStats.topDept} 
+                        subtitle="" 
+                        color="purple" 
+                    />
                  </div>
 
-                 <div className="bg-gradient-to-br from-blue-500 to-cyan-500 p-6 rounded-2xl shadow-lg text-white relative overflow-hidden">
-                    <div className="relative z-10">
-                      <h3 className="text-blue-100 text-sm font-semibold uppercase tracking-wider">{t('avgPerformance')}</h3>
-                      <div className="mt-2 flex items-baseline gap-2">
-                        <span className="text-4xl font-bold">{formatNumber(reportStats.avgScore)}%</span>
-                        <span className="text-sm text-blue-200">{t('avgScore')}</span>
-                      </div>
+                 {/* Row 2: Charts */}
+                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Score Distribution Chart */}
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200" dir="ltr">
+                        <div className="mb-6">
+                           <h3 className={`text-lg font-bold text-slate-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t('scoreDistribution')}</h3>
+                        </div>
+                        <div className="h-64 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={reportStats.scoreDistribution}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                    <XAxis dataKey="name" tick={{fontSize: 12}} />
+                                    <YAxis />
+                                    <Tooltip 
+                                        contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} 
+                                        cursor={{fill: '#f8fafc'}}
+                                    />
+                                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                                        {reportStats.scoreDistribution.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
-                    <div className={`absolute ${isRTL ? 'left-0' : 'right-0'} bottom-0 w-32 h-32 bg-white/10 rounded-full blur-2xl ${isRTL ? '-ml-6' : '-mr-6'} -mb-6`}></div>
+
+                    {/* Department Performance Chart */}
+                    <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200" dir="ltr">
+                        <div className="mb-6">
+                           <h3 className={`text-lg font-bold text-slate-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t('deptPerformance')}</h3>
+                        </div>
+                        <div className="h-64 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={reportStats.deptChartData} layout="vertical">
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                    <XAxis type="number" domain={[0, 100]} />
+                                    <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12}} />
+                                    <Tooltip 
+                                        contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} 
+                                        cursor={{fill: '#f8fafc'}}
+                                    />
+                                    <Bar dataKey="avg" fill="#3b82f6" radius={[0, 4, 4, 0]} name={t('score')} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                 </div>
+
+                 {/* Row 3: Question Analysis */}
+                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+                      <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-amber-500" />
+                        {t('questionAnalysis')}
+                      </h3>
+                      <span className="text-xs text-slate-400 font-medium bg-white px-2 py-1 rounded border border-slate-200">
+                          {t('questionsCount')}: {formatNumber(reportStats.questionAnalysisData.length)}
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto max-h-[400px]">
+                      <table className="min-w-full divide-y divide-slate-100">
+                         <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                            <tr>
+                                <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase w-12">#</th>
+                                <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('questionText')}</th>
+                                <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase w-32">{t('correctRate')}</th>
+                                <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase w-32">{t('studentsCount')}</th>
+                            </tr>
+                         </thead>
+                         <tbody className="bg-white divide-y divide-slate-100">
+                            {reportStats.questionAnalysisData.map((q, idx) => (
+                                <tr key={q.id} className="hover:bg-slate-50">
+                                    <td className="px-6 py-3 text-sm font-bold text-slate-400">{formatNumber(idx + 1)}</td>
+                                    <td className="px-6 py-3 text-sm text-slate-700">
+                                        <div className="line-clamp-2">{q.text}</div>
+                                        <div className="text-xs text-slate-400 mt-1 flex gap-2">
+                                            <span>{t('correctAnswer')}: <b className="text-green-600">{q.correctAnswer}</b></span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-sm font-bold ${q.correctRate < 50 ? 'text-red-600' : q.correctRate < 80 ? 'text-yellow-600' : 'text-green-600'}`}>
+                                                {formatNumber(q.correctRate)}%
+                                            </span>
+                                            <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                <div 
+                                                    className={`h-full rounded-full ${q.correctRate < 50 ? 'bg-red-500' : q.correctRate < 80 ? 'bg-yellow-500' : 'bg-green-500'}`} 
+                                                    style={{width: `${q.correctRate}%`}}
+                                                />
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-3 text-sm text-slate-500 font-mono">
+                                        {formatNumber(q.attempts)}
+                                    </td>
+                                </tr>
+                            ))}
+                         </tbody>
+                      </table>
+                    </div>
                  </div>
                  
-                 <div className="md:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                 {/* Row 4: Detailed List */}
+                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
                       <h3 className="font-bold text-slate-800">{t('detailedResults')}</h3>
                     </div>
@@ -753,6 +976,7 @@ export const AdminDashboard: React.FC = () => {
                              <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('score')}</th>
                              <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('status')}</th>
                              <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('completionDate')}</th>
+                             <th className="px-6 py-3 text-end text-xs font-bold text-slate-500 uppercase">{t('actions')}</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-slate-100">
@@ -781,11 +1005,20 @@ export const AdminDashboard: React.FC = () => {
                                     )}
                                  </td>
                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400 font-mono text-xs text-start">{new Date(p.completedAt).toLocaleDateString(isRTL ? 'ar-SA' : 'en-US')}</td>
+                                 <td className="px-6 py-4 whitespace-nowrap text-end text-sm">
+                                    <button 
+                                      onClick={() => handleResetProgress(u.id)}
+                                      className="text-slate-300 hover:text-red-600 transition-all p-2 rounded-full hover:bg-red-50"
+                                      title={t('reset')}
+                                    >
+                                       <RotateCcw className="w-4 h-4" />
+                                    </button>
+                                 </td>
                                </tr>
                              );
                            })}
                            {reportStats.allParticipants.length === 0 && (
-                             <tr><td colSpan={5} className="px-6 py-12 text-center text-slate-400">{t('noParticipation')}</td></tr>
+                             <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">{t('noParticipation')}</td></tr>
                            )}
                         </tbody>
                       </table>
@@ -964,3 +1197,30 @@ const NavButton = ({ active, onClick, children, icon }: { active: boolean, onCli
     {children}
   </button>
 );
+
+// Simple KPI Card Component
+const ReportCard = ({ title, value, subtitle, color }: { title: string, value: string, subtitle: string, color: string }) => {
+    const { isRTL } = useLanguage();
+    
+    // Color mapping
+    const colorClasses: Record<string, string> = {
+        indigo: 'from-indigo-500 to-indigo-600',
+        blue: 'from-blue-500 to-blue-600',
+        green: 'from-green-500 to-emerald-600',
+        purple: 'from-purple-500 to-fuchsia-600',
+    };
+    
+    return (
+        <div className={`bg-gradient-to-br ${colorClasses[color] || colorClasses.blue} p-5 rounded-2xl shadow-lg text-white relative overflow-hidden`}>
+            <div className="relative z-10">
+                <h3 className="text-white/80 text-xs font-bold uppercase tracking-wider">{title}</h3>
+                <div className="mt-2 flex flex-col">
+                    <span className="text-3xl font-bold tracking-tight">{value}</span>
+                    {subtitle && <span className="text-xs text-white/70 mt-1 font-medium">{subtitle}</span>}
+                </div>
+            </div>
+            {/* Decorative blob */}
+            <div className={`absolute ${isRTL ? '-left-6' : '-right-6'} -bottom-6 w-24 h-24 bg-white/10 rounded-full blur-2xl`}></div>
+        </div>
+    );
+};

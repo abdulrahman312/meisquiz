@@ -1,3 +1,4 @@
+
 export const translations = {
   ar: {
     // General
@@ -109,6 +110,18 @@ export const translations = {
     detailedResults: "النتائج التفصيلية",
     completionDate: "تاريخ الإكمال",
     noParticipation: "لا توجد مشاركات حتى الآن",
+    passRate: "نسبة النجاح",
+    topDept: "القسم الأفضل",
+    scoreDistribution: "توزيع الدرجات",
+    deptPerformance: "أداء الأقسام",
+    questionAnalysis: "تحليل الأسئلة",
+    questionDifficulty: "نسبة الإجابة الصحيحة",
+    correctRate: "الصحة",
+    studentsCount: "عدد",
+    scoreRange: "نطاق الدرجة",
+    reset: "إعادة تعيين",
+    resetConfirmTitle: "إعادة تعيين التقييم",
+    resetConfirmMsg: "سيتم حذف جميع إجابات ودرجات الموظف لهذا التقييم، وسيتمكن من إعادته مرة أخرى. هل أنت متأكد؟",
     
     // Modals
     confirmDelete: "تأكيد الحذف",
@@ -226,6 +239,18 @@ export const translations = {
     detailedResults: "Detailed Results",
     completionDate: "Completion Date",
     noParticipation: "No participation recorded yet",
+    passRate: "Pass Rate",
+    topDept: "Top Dept",
+    scoreDistribution: "Score Distribution",
+    deptPerformance: "Department Performance",
+    questionAnalysis: "Question Analysis",
+    questionDifficulty: "Correct Answer Rate",
+    correctRate: "Correct Rate",
+    studentsCount: "Count",
+    scoreRange: "Score Range",
+    reset: "Reset",
+    resetConfirmTitle: "Reset Assessment",
+    resetConfirmMsg: "This will delete the staff member's answers and score for this assessment, allowing them to retake it. Are you sure?",
     
     // Modals
     confirmDelete: "Confirm Deletion",
