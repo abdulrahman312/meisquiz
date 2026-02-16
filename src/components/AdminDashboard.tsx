@@ -18,7 +18,7 @@ type Tab = 'users' | 'quiz' | 'reports';
 export const AdminDashboard: React.FC = () => {
   const { logout } = useAuth();
   const { t, formatNumber, isRTL } = useLanguage();
-  const [activeTab, setActiveTab] = useState<Tab>('quiz');
+  const [activeTab, setActiveTab] = useState<Tab>('reports');
   const [loading, setLoading] = useState(false);
 
   // --- STATE ---
