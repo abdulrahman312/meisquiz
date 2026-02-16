@@ -63,8 +63,9 @@ export const EmployeeDashboard: React.FC = () => {
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
       <header className="bg-white shadow-sm sticky top-0 z-30 border-b border-blue-50">
         <div className="max-w-5xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 md:gap-3 flex-shrink min-w-0">
+          <div className="flex items-center justify-between gap-4">
+            {/* Branding - constrained width for mobile safety */}
+            <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0 max-w-[70%]">
                {selectedQuiz ? (
                  <button onClick={() => setSelectedQuiz(null)} className={`p-2 ${isRTL ? '-mr-2' : '-ml-2'} text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all flex-shrink-0`}><BackIcon className="w-5 h-5 md:w-6 md:h-6" /></button>
                ) : (
@@ -75,13 +76,16 @@ export const EmployeeDashboard: React.FC = () => {
                  <h2 className="text-blue-500 font-semibold text-[8px] md:text-sm leading-tight tracking-tight truncate">{t('schoolNameEn')}</h2>
                </div>
             </div>
-            <button 
-              onClick={() => logout()} 
-              className="flex items-center gap-1.5 p-2 md:px-3 md:py-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100 flex-shrink-0"
-            >
-              <LogOut className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="text-[10px] md:text-xs font-bold uppercase">{t('logout')}</span>
-            </button>
+            {/* Logout - strictly visible container */}
+            <div className="flex-shrink-0">
+              <button 
+                onClick={() => logout()} 
+                className="flex items-center gap-1 px-2 py-1.5 md:px-3 md:py-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-slate-100 hover:border-red-100 bg-slate-50 md:bg-transparent shadow-sm md:shadow-none"
+              >
+                <LogOut className="w-4 h-4 md:w-5 md:h-5" />
+                <span className="text-[9px] md:text-xs font-bold uppercase tracking-tight">{t('logout')}</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>

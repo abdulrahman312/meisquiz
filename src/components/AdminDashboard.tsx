@@ -426,23 +426,25 @@ export const AdminDashboard: React.FC = () => {
       <header className="bg-white shadow-sm sticky top-0 z-30 border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Top Header Row - Branding & Logout */}
-          <div className="flex items-center justify-between py-3 md:py-4 gap-2">
-            <div className="flex items-center gap-2 md:gap-3 flex-shrink min-w-0">
+          <div className="flex items-center justify-between py-3 md:py-4 gap-4">
+            {/* Constrain branding width to ensure logout button space */}
+            <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0 max-w-[70%]">
               <img src="https://i.ibb.co/bgFrgXkW/meis.png" alt="Logo" className="w-9 h-9 md:w-12 md:h-12 flex-shrink-0" />
               <div className="flex flex-col min-w-0">
                 <h1 className="text-blue-800 font-bold font-arabic text-[9px] md:text-sm leading-tight truncate">{t('schoolNameAr')}</h1>
                 <h2 className="text-blue-600 font-medium text-[8px] md:text-xs leading-tight truncate">{t('schoolNameEn')}</h2>
               </div>
             </div>
+            {/* Logout button container - guaranteed space */}
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="hidden lg:block text-slate-400 font-bold text-[10px] tracking-wider uppercase">{t('adminPortal')}</span>
               <button 
                 onClick={() => logout()} 
-                className="flex items-center gap-1.5 px-3 py-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-transparent hover:border-red-100" 
+                className="flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-slate-100 hover:border-red-100 bg-slate-50/50 md:bg-transparent" 
                 title={t('logout')}
               >
                 <LogOut className="w-4 h-4 md:w-5 md:h-5" />
-                <span className="text-[10px] md:text-xs font-bold uppercase">{t('logout')}</span>
+                <span className="text-[9px] md:text-xs font-bold uppercase tracking-tight">{t('logout')}</span>
               </button>
             </div>
           </div>
