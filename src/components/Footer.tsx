@@ -12,7 +12,7 @@ export const Footer: React.FC = () => {
         <div className="flex items-center gap-2">
           <img src="https://i.ibb.co/bgFrgXkW/meis.png" alt="MEIS Logo" className="w-5 h-5 opacity-80" />
           <div className="flex flex-col">
-             <span className="text-[10px] md:text-xs font-bold text-slate-700 leading-tight">MEIS Staff Assessment Portal</span>
+             <span className="text-[10px] md:text-xs font-bold text-slate-700 leading-tight">MEIS Staff Assessment Portall</span>
              <span className="text-[9px] md:text-[10px] text-slate-400 leading-tight">© {new Date().getFullYear()} All rights reserved</span>
           </div>
         </div>
