@@ -65,7 +65,6 @@ export const AdminDashboard: React.FC = () => {
 
   // Reporting State
   const [reportQuizId, setReportQuizId] = useState<string>('');
-  // We need to fetch questions for reports to show question analysis text
   const [reportQuestions, setReportQuestions] = useState<Question[]>([]);
 
   // --- INITIAL DATA FETCH ---
@@ -74,10 +73,8 @@ export const AdminDashboard: React.FC = () => {
     fetchQuizzes();
   }, []);
 
-  // Fetch questions when opening report tab
   useEffect(() => {
     if (activeTab === 'reports' && reportQuizId) {
-        // Reuse fetch logic but store in separate state so we don't confuse the "Edit Quiz" view
         const loadReportQs = async () => {
             const snap = await db.collection('quizzes').doc(reportQuizId).collection('questions').orderBy('order').get();
             setReportQuestions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Question)));
@@ -109,32 +106,17 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  // --- STAFF ACTIONS ---
-  const openAddUserModal = () => {
-    setEditingUser(null);
-    setUserData({ name: '', employeeId: '', department: '' });
-    setShowUserModal(true);
-  };
-
-  const openEditUserModal = (u: QuizUser) => {
-    setEditingUser(u);
-    setUserData({ name: u.name, employeeId: u.employeeId, department: u.department });
-    setShowUserModal(true);
-  };
-
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       if (editingUser) {
-        // Edit existing
         await db.collection('users').doc(editingUser.id).update({
           name: userData.name,
           employeeId: userData.employeeId,
           department: userData.department
         });
       } else {
-        // Create new
         await db.collection('users').add({
           ...userData,
           role: 'employee',
@@ -188,13 +170,11 @@ export const AdminDashboard: React.FC = () => {
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         } catch (error: any) {
           console.error("Delete user error:", error);
-          alert("Failed to delete user. " + (error.message || ""));
         }
       }
     });
   };
 
-  // --- QUIZ ACTIONS ---
   const handleCreateQuiz = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newQuizTitle.trim()) return;
@@ -219,7 +199,6 @@ export const AdminDashboard: React.FC = () => {
       setQuizzes(quizzes.map(q => q.id === quiz.id ? { ...q, isActive: !q.isActive } : q));
     } catch (error) {
       console.error("Error toggling status:", error);
-      alert("Failed to update status.");
     }
   };
 
@@ -229,14 +208,12 @@ export const AdminDashboard: React.FC = () => {
       await db.collection('quizzes').doc(selectedQuiz.id).update({
         title: editTitleValue
       });
-      
       const updated = { ...selectedQuiz, title: editTitleValue };
       setSelectedQuiz(updated);
       setQuizzes(prev => prev.map(q => q.id === updated.id ? updated : q));
       setIsEditingTitle(false);
     } catch (error) {
       console.error("Error updating title:", error);
-      alert("Failed to update title");
     }
   };
 
@@ -253,7 +230,6 @@ export const AdminDashboard: React.FC = () => {
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         } catch (error: any) {
           console.error("Delete quiz error:", error);
-          alert("Failed to delete quiz. " + (error.message || ""));
         }
       }
     });
@@ -265,38 +241,15 @@ export const AdminDashboard: React.FC = () => {
     await fetchQuestions(quiz.id);
   };
 
-  // --- QUESTION ACTIONS (Inside Quiz) ---
-  const openAddQuestionModal = () => {
-    setEditingQuestion(null);
-    setQuestionData({
-      text: '',
-      options: { A: '', B: '', C: '', D: '' },
-      correctAnswer: 'A'
-    });
-    setShowQuestionModal(true);
-  };
-
-  const openEditQuestionModal = (q: Question) => {
-    setEditingQuestion(q);
-    setQuestionData({
-      text: q.text,
-      options: { ...q.options },
-      correctAnswer: q.correctAnswer
-    });
-    setShowQuestionModal(true);
-  };
-
   const handleSaveQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedQuiz) return;
     try {
       if (editingQuestion) {
-         // Update existing
          await db.collection('quizzes').doc(selectedQuiz.id).collection('questions').doc(editingQuestion.id).update({
            ...questionData
          });
       } else {
-         // Create new
          const order = quizQuestions.length + 1;
          await db.collection('quizzes').doc(selectedQuiz.id).collection('questions').add({
            ...questionData,
@@ -316,9 +269,8 @@ export const AdminDashboard: React.FC = () => {
     setLoading(true);
     try {
       const parsed = await parseQuestionsExcel(e.target.files[0]);
-      
       if (parsed.length === 0) {
-        alert("No valid questions found. Please ensure your Excel file matches the template format.\n\nRequired Columns:\n- Question\n- Option A\n- Option B\n- Option C\n- Option D\n- Correct Answer");
+        alert("No valid questions found.");
       } else {
         const batch = db.batch();
         parsed.forEach((q, idx) => {
@@ -331,7 +283,6 @@ export const AdminDashboard: React.FC = () => {
       }
     } catch (err) {
       console.error(err);
-      alert("Import failed. Please check the file format.");
     } finally {
       setLoading(false);
       e.target.value = ''; 
@@ -351,29 +302,47 @@ export const AdminDashboard: React.FC = () => {
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         } catch (error: any) {
           console.error("Delete question error:", error);
-          alert("Failed to delete question. " + (error.message || ""));
         }
       }
     });
   };
 
-  // --- REPORT GENERATION & ANALYTICS ---
+  // --- HELPERS FOR MODALS ---
+  const openAddUserModal = () => {
+    setEditingUser(null);
+    setUserData({ name: '', employeeId: '', department: '' });
+    setShowUserModal(true);
+  };
+
+  const openEditUserModal = (u: QuizUser) => {
+    setEditingUser(u);
+    setUserData({ name: u.name, employeeId: u.employeeId, department: u.department });
+    setShowUserModal(true);
+  };
+
+  const openAddQuestionModal = () => {
+    setEditingQuestion(null);
+    setQuestionData({ text: '', options: { A: '', B: '', C: '', D: '' }, correctAnswer: 'A' });
+    setShowQuestionModal(true);
+  };
+
+  const openEditQuestionModal = (q: Question) => {
+    setEditingQuestion(q);
+    setQuestionData({ text: q.text, options: { ...q.options }, correctAnswer: q.correctAnswer });
+    setShowQuestionModal(true);
+  };
+
   const reportStats = useMemo(() => {
     if (!reportQuizId) return null;
-    
-    // 1. Filter Participants
     const allParticipants = users.filter(u => u.participations && u.participations[reportQuizId]);
     const fullyCompletedUsers = allParticipants.filter(u => {
         const p = u.participations![reportQuizId];
         return p.answers && p.totalQuestions && Object.keys(p.answers).length === p.totalQuestions;
     });
-
     const totalCompleted = fullyCompletedUsers.length;
     let totalScore = 0;
     let maxScorePossible = 0; 
     let passedCount = 0;
-
-    // 2. Department & Score Stats
     const deptStats: { [dept: string]: { totalScore: number, count: number } } = {};
     const scoreDistribution = [
         { name: '0-20%', count: 0, fill: '#ef4444' }, 
@@ -382,83 +351,41 @@ export const AdminDashboard: React.FC = () => {
         { name: '61-80%', count: 0, fill: '#84cc16' }, 
         { name: '81-100%', count: 0, fill: '#22c55e' }
     ];
-
-    // 3. Question Analysis Stats
     const questionAnalysis: { [qId: string]: { correct: number, total: number } } = {};
-
     if (fullyCompletedUsers.length > 0) {
        maxScorePossible = fullyCompletedUsers[0].participations![reportQuizId].totalQuestions;
-       
        fullyCompletedUsers.forEach(u => {
          const p = u.participations![reportQuizId];
          const percentage = (p.score / p.totalQuestions) * 100;
-         
-         // Aggregate Total Score
          totalScore += p.score;
-         
-         // Aggregate Pass (assuming 50%)
          if (percentage >= 50) passedCount++;
-
-         // Aggregate Department Stats
          const dept = u.department || 'Unknown';
          if (!deptStats[dept]) deptStats[dept] = { totalScore: 0, count: 0 };
          deptStats[dept].totalScore += percentage;
          deptStats[dept].count++;
-
-         // Aggregate Score Dist
          if (percentage <= 20) scoreDistribution[0].count++;
          else if (percentage <= 40) scoreDistribution[1].count++;
          else if (percentage <= 60) scoreDistribution[2].count++;
          else if (percentage <= 80) scoreDistribution[3].count++;
          else scoreDistribution[4].count++;
-
-         // Aggregate Question Stats
-         Object.entries(p.answers).forEach(([qId, ans]) => {
+         // Fix line 351: Specify type for entries to avoid 'unknown' error
+         Object.entries(p.answers).forEach(([qId, ans]: [string, any]) => {
             if (!questionAnalysis[qId]) questionAnalysis[qId] = { correct: 0, total: 0 };
             questionAnalysis[qId].total++;
             if (ans.isCorrect) questionAnalysis[qId].correct++;
          });
        });
     }
-
-    const avgScore = totalCompleted > 0 && maxScorePossible > 0
-      ? Math.round((totalScore / (totalCompleted * maxScorePossible)) * 100) 
-      : 0;
-    
+    const avgScore = totalCompleted > 0 && maxScorePossible > 0 ? Math.round((totalScore / (totalCompleted * maxScorePossible)) * 100) : 0;
     const passRate = totalCompleted > 0 ? Math.round((passedCount / totalCompleted) * 100) : 0;
-
-    // Format Dept Chart Data
-    const deptChartData = Object.entries(deptStats).map(([name, data]) => ({
-        name,
-        avg: Math.round(data.totalScore / data.count),
-        count: data.count
-    })).sort((a,b) => b.avg - a.avg);
-
-    // Identify Top Department
+    const deptChartData = Object.entries(deptStats).map(([name, data]) => ({ name, avg: Math.round(data.totalScore / data.count), count: data.count })).sort((a,b) => b.avg - a.avg);
     const topDept = deptChartData.length > 0 ? deptChartData[0].name : '-';
-
-    // Format Question Analysis
     const questionAnalysisData = reportQuestions.map(q => {
         const stats = questionAnalysis[q.id] || { correct: 0, total: 0 };
         const rate = stats.total > 0 ? Math.round((stats.correct / stats.total) * 100) : 0;
-        return {
-            ...q,
-            correctRate: rate,
-            attempts: stats.total
-        };
-    }).sort((a,b) => a.correctRate - b.correctRate); // Sort by hardest first
-
-    return { 
-        totalCompleted, 
-        avgScore, 
-        passRate,
-        topDept,
-        allParticipants, 
-        maxScorePossible,
-        scoreDistribution,
-        deptChartData,
-        questionAnalysisData
-    };
+        return { ...q, correctRate: rate, attempts: stats.total };
+    }).sort((a,b) => a.correctRate - b.correctRate);
+    return { totalCompleted, avgScore, passRate, topDept, allParticipants, maxScorePossible, scoreDistribution, deptChartData, questionAnalysisData };
   }, [users, reportQuizId, reportQuestions]);
 
   const handleExportReport = () => {
@@ -466,15 +393,7 @@ export const AdminDashboard: React.FC = () => {
     const data = users.map(u => {
       const part = u.participations?.[reportQuizId];
       const isComplete = part && part.answers && part.totalQuestions && Object.keys(part.answers).length === part.totalQuestions;
-      
-      return {
-        'Employee ID': u.employeeId,
-        'Name': u.name,
-        'Department': u.department,
-        'Status': isComplete ? 'Completed' : part ? 'In Progress' : 'Not Started',
-        'Score': part ? `${part.score}/${part.totalQuestions}` : '-',
-        'Date': part ? new Date(part.completedAt).toLocaleDateString() : '-'
-      };
+      return { 'Employee ID': u.employeeId, 'Name': u.name, 'Department': u.department, 'Status': isComplete ? 'Completed' : part ? 'In Progress' : 'Not Started', 'Score': part ? `${part.score}/${part.totalQuestions}` : '-', 'Date': part ? new Date(part.completedAt).toLocaleDateString() : '-' };
     });
     exportReportsToExcel(data, 'Quiz_Report');
   };
@@ -486,12 +405,7 @@ export const AdminDashboard: React.FC = () => {
         message: t('resetConfirmMsg'),
         onConfirm: async () => {
             try {
-                // Delete the specific quiz participation key from the user document
-                await db.collection('users').doc(userId).update({
-                    [`participations.${reportQuizId}`]: firebase.firestore.FieldValue.delete()
-                });
-
-                // Optimistic UI update
+                await db.collection('users').doc(userId).update({ [`participations.${reportQuizId}`]: firebase.firestore.FieldValue.delete() });
                 setUsers(prev => prev.map(u => {
                     if (u.id === userId && u.participations) {
                         const newParts = { ...u.participations };
@@ -500,134 +414,93 @@ export const AdminDashboard: React.FC = () => {
                     }
                     return u;
                 }));
-
                 setConfirmModal(prev => ({ ...prev, isOpen: false }));
-            } catch (error) {
-                console.error("Error resetting progress:", error);
-                alert("Failed to reset progress.");
-            }
+            } catch (error) { console.error(error); }
         }
     });
   };
 
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
-
-  // --- RENDER HELPERS ---
-  
   if (loading && !users.length && !quizzes.length) return <div className="min-h-screen flex items-center justify-center text-slate-400">{t('loading')}</div>;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
-      {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-30 border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center py-4 md:h-20 md:py-0 gap-4">
-            
-            {/* Branding - Centered on mobile, left on desktop */}
-            <div className="flex items-center gap-4 w-full md:w-auto justify-center md:justify-start">
-               <img src="https://i.ibb.co/bgFrgXkW/meis.png" alt="Logo" className="w-10 h-10 md:w-12 md:h-12" />
-               <div className="flex flex-col text-center md:text-start">
-                 <h1 className="text-blue-800 font-bold font-arabic text-xs md:text-sm leading-tight">{t('schoolNameAr')}</h1>
-                 <h2 className="text-blue-600 font-medium text-[10px] md:text-xs leading-tight">{t('schoolNameEn')}</h2>
-               </div>
-               {/* Separator hidden on mobile */}
-               <div className="h-8 w-px bg-slate-200 mx-2 hidden md:block"></div>
-               <span className="text-slate-400 font-semibold text-sm tracking-wider uppercase hidden md:block">{t('adminPortal')}</span>
+          {/* Top Header Row - Branding & Logout */}
+          <div className="flex items-center justify-between py-3 md:py-4">
+            <div className="flex items-center gap-3">
+              <img src="https://i.ibb.co/bgFrgXkW/meis.png" alt="Logo" className="w-10 h-10 md:w-12 md:h-12" />
+              <div className="flex flex-col">
+                <h1 className="text-blue-800 font-bold font-arabic text-[10px] md:text-sm leading-tight">{t('schoolNameAr')}</h1>
+                <h2 className="text-blue-600 font-medium text-[9px] md:text-xs leading-tight">{t('schoolNameEn')}</h2>
+              </div>
             </div>
-
-            <div className="flex flex-col md:flex-row items-center gap-3 w-full md:w-auto">
-               {/* Nav Pills - Full width on mobile */}
-               <div className="flex bg-slate-100 p-1 rounded-xl w-full md:w-auto justify-between md:justify-start">
-                <NavButton active={activeTab === 'quiz'} onClick={() => setActiveTab('quiz')} icon={<CheckSquare className="w-4 h-4" />}>{t('manageQuizzes')}</NavButton>
-                <NavButton active={activeTab === 'users'} onClick={() => setActiveTab('users')} icon={<Users className="w-4 h-4" />}>{t('manageStaff')}</NavButton>
-                <NavButton active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} icon={<LayoutDashboard className="w-4 h-4" />}>{t('reports')}</NavButton>
-               </div>
-              
-              <button onClick={() => logout()} className="hidden md:block p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title={t('logout')}>
+            <div className="flex items-center gap-2">
+              <span className="hidden sm:block text-slate-400 font-bold text-[10px] tracking-wider uppercase">{t('adminPortal')}</span>
+              <button 
+                onClick={() => logout()} 
+                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all" 
+                title={t('logout')}
+              >
                 <LogOut className="w-5 h-5" />
               </button>
+            </div>
+          </div>
+          
+          {/* Bottom Header Row - Navigation Tabs */}
+          <div className="pb-3 md:pb-4 overflow-x-auto scrollbar-hide">
+            <div className="flex bg-slate-100 p-1 rounded-xl w-full min-w-max md:min-w-0">
+              <NavButton active={activeTab === 'quiz'} onClick={() => setActiveTab('quiz')} icon={<CheckSquare className="w-4 h-4" />}>{t('manageQuizzes')}</NavButton>
+              <NavButton active={activeTab === 'users'} onClick={() => setActiveTab('users')} icon={<Users className="w-4 h-4" />}>{t('manageStaff')}</NavButton>
+              <NavButton active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} icon={<LayoutDashboard className="w-4 h-4" />}>{t('reports')}</NavButton>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* --- QUIZZES TAB --- */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         {activeTab === 'quiz' && (
           <div>
             {!selectedQuiz ? (
-              // LIST VIEW
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex justify-between items-end mb-8">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 gap-4">
                   <div>
                     <h2 className="text-2xl font-bold text-slate-800">{t('manageQuizzes')}</h2>
                   </div>
                   <button 
                     onClick={() => setShowCreateQuizModal(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-blue-500/20 flex items-center gap-2 transition-all transform hover:scale-105"
+                    className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 transition-all transform active:scale-95"
                   >
                     <Plus className="w-5 h-5" /> {t('createQuiz')}
                   </button>
                 </div>
-                
                 {quizzes.length === 0 ? (
-                  <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-slate-200">
-                    <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <LayoutDashboard className="w-10 h-10 text-slate-300" />
-                    </div>
+                  <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200">
+                    <LayoutDashboard className="w-10 h-10 text-slate-300 mx-auto mb-4" />
                     <p className="text-slate-500 font-medium text-lg">{t('noQuizzesAdmin')}</p>
                     <button onClick={() => setShowCreateQuizModal(true)} className="mt-4 text-blue-600 hover:underline">{t('createFirstQuiz')}</button>
                   </div>
                 ) : (
                   <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                     {quizzes.map(q => (
-                      <div key={q.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-900/5 hover:border-blue-100 transition-all group relative overflow-hidden">
+                      <div key={q.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 hover:shadow-xl hover:shadow-blue-900/5 transition-all group relative">
                         <div className="flex justify-between items-start mb-4">
-                           <div className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${q.isActive ? 'bg-green-50 text-green-700 border-green-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                             {q.isActive ? t('active') : t('draft')}
-                           </div>
-                           
-                           <button 
-                             type="button"
-                             onClick={(e) => { 
-                               e.preventDefault();
-                               e.stopPropagation(); 
-                               handleDeleteQuiz(q.id); 
-                             }} 
-                             className={`text-slate-300 hover:text-red-500 p-2 ${isRTL ? '-ml-2' : '-mr-2'} rounded-full hover:bg-red-50 transition-all`}
-                             title={t('delete')}
-                           >
-                             <Trash2 className="w-5 h-5 pointer-events-none" />
-                           </button>
+                           <div className={`px-3 py-1 rounded-lg text-xs font-bold border ${q.isActive ? 'bg-green-50 text-green-700 border-green-100' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{q.isActive ? t('active') : t('draft')}</div>
+                           <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDeleteQuiz(q.id); }} className="text-slate-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition-all"><Trash2 className="w-5 h-5" /></button>
                         </div>
-                        
                         <h3 className="text-lg font-bold text-slate-800 mb-2 truncate group-hover:text-blue-600 transition-colors">{q.title}</h3>
                         <div className="flex items-center gap-2 text-xs text-slate-400 mb-6 font-mono">
                            <span>ID: {q.id.substring(0,6)}</span>
                            <span>•</span>
                            <span>{new Date(q.createdAt).toLocaleDateString(isRTL ? 'ar-SA' : 'en-US')}</span>
                         </div>
-                        
                         <div className="grid grid-cols-2 gap-3 mt-auto">
-                          <button 
-                             onClick={(e) => { e.stopPropagation(); handleToggleQuizStatus(q); }}
-                             className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors border ${
-                               q.isActive 
-                               ? 'bg-white text-red-600 border-red-100 hover:bg-red-50' 
-                               : 'bg-green-50 text-green-700 border-green-100 hover:bg-green-100'
-                             }`}
-                          >
+                          <button onClick={(e) => { e.stopPropagation(); handleToggleQuizStatus(q); }} className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all border ${q.isActive ? 'bg-white text-red-600 border-red-100 hover:bg-red-50' : 'bg-green-50 text-green-700 border-green-100 hover:bg-green-100'}`}>
                              {q.isActive ? <StopCircle className="w-4 h-4" /> : <PlayCircle className="w-4 h-4" />}
                              {q.isActive ? t('stop') : t('publish')}
                           </button>
-                          
-                          <button 
-                            onClick={() => selectQuiz(q)}
-                            className="w-full bg-slate-900 hover:bg-black text-white py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10"
-                          >
-                            <Edit2 className="w-3 h-3" /> {t('edit')}
-                          </button>
+                          <button onClick={() => selectQuiz(q)} className="w-full bg-slate-900 hover:bg-black text-white py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10"><Edit2 className="w-3 h-3" /> {t('edit')}</button>
                         </div>
                       </div>
                     ))}
@@ -635,130 +508,59 @@ export const AdminDashboard: React.FC = () => {
                 )}
               </div>
             ) : (
-              // DETAIL VIEW
               <div className={`animate-in ${isRTL ? 'slide-in-from-left-4' : 'slide-in-from-right-4'} duration-300`}>
-                <button onClick={() => setSelectedQuiz(null)} className="mb-6 text-sm text-slate-500 hover:text-slate-900 flex items-center gap-1 font-medium transition-colors">
-                  <BackIcon className="w-4 h-4" /> {t('back')}
-                </button>
-                
+                <button onClick={() => setSelectedQuiz(null)} className="mb-6 text-sm text-slate-500 hover:text-slate-900 flex items-center gap-1 font-medium transition-colors"><BackIcon className="w-4 h-4" /> {t('back')}</button>
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6">
-                  {/* Detail Header */}
-                  <div className="p-8 border-b border-slate-100 flex flex-col md:flex-row md:justify-between md:items-center gap-6">
-                    <div>
+                  <div className="p-6 md:p-8 border-b border-slate-100 flex flex-col xl:flex-row xl:justify-between xl:items-center gap-6">
+                    <div className="flex-1">
                       {isEditingTitle ? (
                         <div className="flex items-center gap-2 mb-1">
-                          <input 
-                            type="text" 
-                            value={editTitleValue}
-                            onChange={(e) => setEditTitleValue(e.target.value)}
-                            className="text-2xl font-bold text-slate-900 border-b-2 border-blue-500 focus:outline-none bg-transparent px-1 w-full md:w-auto min-w-[300px]"
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleUpdateTitle();
-                              if (e.key === 'Escape') setIsEditingTitle(false);
-                            }}
-                          />
-                          <button onClick={handleUpdateTitle} className="p-1.5 text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors" title={t('save')}>
-                            <Check className="w-5 h-5" />
-                          </button>
-                          <button onClick={() => setIsEditingTitle(false)} className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors" title={t('cancel')}>
-                            <X className="w-5 h-5" />
-                          </button>
+                          <input type="text" value={editTitleValue} onChange={(e) => setEditTitleValue(e.target.value)} className="text-xl md:text-2xl font-bold text-slate-900 border-b-2 border-blue-500 focus:outline-none bg-transparent px-1 w-full md:w-auto min-w-[200px]" autoFocus onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateTitle(); if (e.key === 'Escape') setIsEditingTitle(false); }} />
+                          <button onClick={handleUpdateTitle} className="p-1.5 text-green-600 bg-green-50 rounded-lg"><Check className="w-5 h-5" /></button>
+                          <button onClick={() => setIsEditingTitle(false)} className="p-1.5 text-red-600 bg-red-50 rounded-lg"><X className="w-5 h-5" /></button>
                         </div>
                       ) : (
                         <div className="flex items-center gap-3 group mb-1">
-                          <h2 className="text-2xl font-bold text-slate-900">{selectedQuiz.title}</h2>
-                          <button 
-                            onClick={() => { setEditTitleValue(selectedQuiz.title); setIsEditingTitle(true); }}
-                            className="text-slate-400 hover:text-blue-600 opacity-0 group-hover:opacity-100 transition-all p-1 rounded-md hover:bg-slate-100"
-                            title={t('edit')}
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
+                          <h2 className="text-xl md:text-2xl font-bold text-slate-900">{selectedQuiz.title}</h2>
+                          <button onClick={() => { setEditTitleValue(selectedQuiz.title); setIsEditingTitle(true); }} className="text-slate-400 hover:text-blue-600 opacity-100 xl:opacity-0 xl:group-hover:opacity-100 transition-all p-1 rounded-md hover:bg-slate-100"><Edit2 className="w-4 h-4" /></button>
                         </div>
                       )}
                       <div className="flex items-center gap-3 mt-2">
-                        <span className="text-sm font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{formatNumber(quizQuestions.length)} {t('questionsCount')}</span>
-                        <span className={`text-sm font-bold flex items-center gap-1.5 ${selectedQuiz.isActive ? 'text-green-600' : 'text-slate-400'}`}>
-                          <span className={`w-2 h-2 rounded-full ${selectedQuiz.isActive ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`}></span>
-                          {selectedQuiz.isActive ? t('live') : t('draft')}
-                        </span>
+                        <span className="text-xs md:text-sm font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded">{formatNumber(quizQuestions.length)} {t('questionsCount')}</span>
+                        <span className={`text-xs md:text-sm font-bold flex items-center gap-1.5 ${selectedQuiz.isActive ? 'text-green-600' : 'text-slate-400'}`}><span className={`w-2 h-2 rounded-full ${selectedQuiz.isActive ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`}></span>{selectedQuiz.isActive ? t('live') : t('draft')}</span>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-3">
-                      <button 
-                        onClick={downloadQuestionTemplate}
-                        className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
-                      >
-                        <Download className="w-4 h-4" /> {t('template')}
-                      </button>
-                      <label className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2 text-sm font-medium transition-colors">
-                        <Upload className="w-4 h-4" /> {t('import')}
-                        <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleQuestionImport} />
-                      </label>
-                      <button 
-                        onClick={openAddQuestionModal}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors shadow-lg shadow-indigo-500/20"
-                      >
-                        <Plus className="w-4 h-4" /> {t('addQuestion')}
-                      </button>
+                    <div className="flex flex-wrap gap-2 md:gap-3">
+                      <button onClick={downloadQuestionTemplate} className="flex-1 md:flex-none justify-center bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg flex items-center gap-2 text-xs md:text-sm font-medium transition-colors"><Download className="w-4 h-4" /> {t('template')}</button>
+                      <label className="flex-1 md:flex-none justify-center bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg cursor-pointer flex items-center gap-2 text-xs md:text-sm font-medium transition-colors"><Upload className="w-4 h-4" /> {t('import')}<input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleQuestionImport} /></label>
+                      <button onClick={openAddQuestionModal} className="w-full xl:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-medium transition-colors shadow-lg shadow-indigo-500/20"><Plus className="w-4 h-4" /> {t('addQuestion')}</button>
                     </div>
                   </div>
-
                   <div className="divide-y divide-slate-100 bg-slate-50/30">
                     {quizQuestions.length === 0 ? (
                       <div className="p-16 text-center text-slate-400">
-                        <div className="bg-white w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                           <FileSpreadsheet className="w-8 h-8 text-slate-300" />
-                        </div>
+                        <FileSpreadsheet className="w-8 h-8 text-slate-300 mx-auto mb-4" />
                         <p className="mb-1 font-medium text-slate-600">{t('emptyQuiz')}</p>
                         <p className="text-sm">{t('emptyQuizDesc')}</p>
                       </div>
                     ) : (
                       quizQuestions.map((q) => (
-                        <div key={q.id} className={`p-5 hover:bg-white hover:shadow-sm transition-all flex gap-5 group ${isRTL ? 'border-r-4' : 'border-l-4'} border-transparent hover:border-indigo-500 relative`}>
-                          <div className="flex-shrink-0 w-10 h-10 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-sm font-bold text-slate-500 shadow-sm">
-                            {formatNumber(q.order)}
-                          </div>
-                          <div className={`flex-1 ${isRTL ? 'pl-16' : 'pr-16'}`}>
-                            <p className="font-semibold text-slate-800 mb-3 text-lg">{q.text}</p>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                              {(['A', 'B', 'C', 'D'] as const).map((key) => {
-                                const val = q.options[key];
-                                return (
+                        <div key={q.id} className={`p-4 md:p-5 hover:bg-white transition-all flex gap-4 md:gap-5 group ${isRTL ? 'border-r-4' : 'border-l-4'} border-transparent hover:border-indigo-500 relative`}>
+                          <div className="flex-shrink-0 w-8 h-8 md:w-10 md:h-10 bg-white border border-slate-200 rounded-lg flex items-center justify-center text-sm font-bold text-slate-500 shadow-sm">{formatNumber(q.order)}</div>
+                          <div className={`flex-1 ${isRTL ? 'pl-8 md:pl-16' : 'pr-8 md:pr-16'}`}>
+                            <p className="font-semibold text-slate-800 mb-3 text-sm md:text-lg leading-relaxed">{q.text}</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs md:text-sm">
+                              {(['A', 'B', 'C', 'D'] as const).map((key) => (
                                 <div key={key} className={`px-3 py-2 rounded-lg flex items-center gap-3 border ${key === q.correctAnswer ? 'bg-green-50 border-green-200 text-green-800 font-medium' : 'bg-white border-slate-100 text-slate-500'}`}>
                                   <span className={`w-6 h-6 rounded flex items-center justify-center text-xs border ${key === q.correctAnswer ? 'border-green-300 bg-white' : 'border-slate-200 bg-slate-50'}`}>{key}</span>
-                                  <span>{val}</span>
+                                  <span>{q.options[key]}</span>
                                 </div>
-                              )})}
+                              ))}
                             </div>
                           </div>
-                          
-                          <div className={`absolute top-5 ${isRTL ? 'left-5' : 'right-5'} flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity`}>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                openEditQuestionModal(q);
-                              }}
-                              className="text-slate-400 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors"
-                              title={t('edit')}
-                            >
-                              <Edit2 className="w-5 h-5" />
-                            </button>
-                            <button 
-                              type="button"
-                              onClick={(e) => { 
-                                e.preventDefault();
-                                e.stopPropagation(); 
-                                handleDeleteQuestion(q.id); 
-                              }} 
-                              className="text-slate-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
-                              title={t('delete')}
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
+                          <div className={`absolute top-4 ${isRTL ? 'left-4' : 'right-4'} flex flex-col md:flex-row gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity`}>
+                            <button onClick={() => openEditQuestionModal(q)} className="text-slate-400 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50"><Edit2 className="w-4 h-4 md:w-5 md:h-5" /></button>
+                            <button onClick={() => handleDeleteQuestion(q.id)} className="text-slate-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50"><Trash2 className="w-4 h-4 md:w-5 md:h-5" /></button>
                           </div>
                         </div>
                       ))
@@ -770,46 +572,32 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* --- USERS TAB --- */}
         {activeTab === 'users' && (
           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
              <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center bg-slate-50/50 gap-4">
               <h2 className="text-xl font-bold text-slate-800">{t('manageStaff')}</h2>
-              <div className="flex flex-wrap gap-3 justify-center w-full md:w-auto">
-                 <button 
-                    onClick={downloadUserTemplate}
-                    className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors"
-                 >
-                    <Download className="w-4 h-4" /> {t('template')}
-                 </button>
-                 <label className="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2 text-sm font-medium transition-colors">
-                  <Upload className="w-4 h-4" /> {t('importExcel')}
-                  <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleUserImport} />
-                </label>
-                <button 
-                  onClick={openAddUserModal}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium transition-colors shadow-md shadow-blue-500/20"
-                >
-                  <Plus className="w-4 h-4" /> {t('addStaff')}
-                </button>
+              <div className="flex flex-wrap gap-2 justify-center w-full md:w-auto">
+                 <button onClick={downloadUserTemplate} className="flex-1 md:flex-none bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-xs font-medium transition-colors"><Download className="w-4 h-4" /> {t('template')}</button>
+                 <label className="flex-1 md:flex-none bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg cursor-pointer flex items-center justify-center gap-2 text-xs font-medium transition-colors"><Upload className="w-4 h-4" /> {t('importExcel')}<input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleUserImport} /></label>
+                 <button onClick={openAddUserModal} className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-medium transition-colors shadow-md shadow-blue-500/20"><Plus className="w-4 h-4" /> {t('addStaff')}</button>
               </div>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-100">
                 <thead className="bg-slate-50">
                   <tr>
-                    <th className="px-6 py-4 text-start text-xs font-bold text-slate-500 uppercase tracking-wider">{t('employeeId')}</th>
-                    <th className="px-6 py-4 text-start text-xs font-bold text-slate-500 uppercase tracking-wider">{t('staffName')}</th>
-                    <th className="px-6 py-4 text-start text-xs font-bold text-slate-500 uppercase tracking-wider">{t('department')}</th>
-                    <th className="px-6 py-4 text-end text-xs font-bold text-slate-500 uppercase tracking-wider">{t('actions')}</th>
+                    <th className="px-6 py-4 text-start text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t('employeeId')}</th>
+                    <th className="px-6 py-4 text-start text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t('staffName')}</th>
+                    <th className="px-6 py-4 text-start text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t('department')}</th>
+                    <th className="px-6 py-4 text-end text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t('actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-100">
                   {users.map((u) => (
                     <tr key={u.id} className="hover:bg-slate-50 transition-colors group">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 font-mono text-start">{u.employeeId}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-700 text-start">
                          <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-xs">{u.name.charAt(0)}</div>
                             {u.name}
@@ -819,30 +607,8 @@ export const AdminDashboard: React.FC = () => {
                         <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-medium">{u.department}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-end text-sm font-medium">
-                        <button 
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            openEditUserModal(u);
-                          }}
-                          className={`text-slate-300 hover:text-blue-600 transition-colors p-2 rounded-lg hover:bg-blue-50 ${isRTL ? 'ml-1' : 'mr-1'}`}
-                          title={t('edit')}
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={(e) => { 
-                            e.preventDefault();
-                            e.stopPropagation(); 
-                            handleDeleteUser(u.id); 
-                          }} 
-                          className="text-slate-300 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50"
-                          title={t('delete')}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <button onClick={() => openEditUserModal(u)} className={`text-slate-300 hover:text-blue-600 transition-colors p-2 rounded-lg hover:bg-blue-50 ${isRTL ? 'ml-1' : 'mr-1'}`}><Edit2 className="w-4 h-4" /></button>
+                        <button onClick={() => handleDeleteUser(u.id)} className="text-slate-300 hover:text-red-600 transition-colors p-2 rounded-lg hover:bg-red-50"><Trash2 className="w-4 h-4" /></button>
                       </td>
                     </tr>
                   ))}
@@ -856,424 +622,132 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* --- REPORTS TAB --- */}
         {activeTab === 'reports' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex flex-col md:flex-row items-start md:items-center gap-4 bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
               <div className="flex-1 w-full">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 block">{t('selectAssessment')}</label>
                 <div className="relative">
-                  <select 
-                    value={reportQuizId} 
-                    onChange={(e) => setReportQuizId(e.target.value)}
-                    className={`w-full md:w-80 border-slate-200 rounded-xl shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50 py-2.5 ${isRTL ? 'pr-3 pl-10' : 'pl-3 pr-10'} bg-white hover:bg-slate-50 transition-colors cursor-pointer text-slate-800`}
-                  >
+                  <select value={reportQuizId} onChange={(e) => setReportQuizId(e.target.value)} className={`w-full md:w-80 border-slate-200 rounded-xl shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 py-2.5 ${isRTL ? 'pr-3 pl-10' : 'pl-3 pr-10'} bg-white text-slate-800`}>
                     {quizzes.length === 0 && <option>{t('noQuizzesAdmin')}</option>}
                     {quizzes.map(q => <option key={q.id} value={q.id}>{q.title}</option>)}
                   </select>
                 </div>
               </div>
-              <button 
-                onClick={handleExportReport}
-                disabled={!reportStats}
-                className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all shadow-lg shadow-green-500/20 disabled:opacity-50 disabled:shadow-none"
-              >
-                <FileSpreadsheet className="w-5 h-5" /> {t('downloadReport')}
-              </button>
+              <button onClick={handleExportReport} disabled={!reportStats} className="w-full md:w-auto bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all shadow-lg shadow-green-500/20 disabled:opacity-50"><FileSpreadsheet className="w-5 h-5" /> {t('downloadReport')}</button>
             </div>
-
-            {reportStats ? (
+            {reportStats && (
               <div className="space-y-6">
-                 {/* Row 1: KPI Cards */}
                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <ReportCard 
-                        title={t('participation')} 
-                        value={formatNumber(reportStats.totalCompleted)} 
-                        subtitle={t('staffCompleted')} 
-                        color="indigo" 
-                    />
-                    <ReportCard 
-                        title={t('avgPerformance')} 
-                        value={`${formatNumber(reportStats.avgScore)}%`} 
-                        subtitle={t('avgScore')} 
-                        color="blue" 
-                    />
-                    <ReportCard 
-                        title={t('passRate')} 
-                        value={`${formatNumber(reportStats.passRate)}%`} 
-                        subtitle={"> 50%"} 
-                        color="green" 
-                    />
-                    <ReportCard 
-                        title={t('topDept')} 
-                        value={reportStats.topDept} 
-                        subtitle="" 
-                        color="purple" 
-                    />
+                    <ReportCard title={t('participation')} value={formatNumber(reportStats.totalCompleted)} subtitle={t('staffCompleted')} color="indigo" />
+                    <ReportCard title={t('avgPerformance')} value={`${formatNumber(reportStats.avgScore)}%`} subtitle={t('avgScore')} color="blue" />
+                    <ReportCard title={t('passRate')} value={`${formatNumber(reportStats.passRate)}%`} subtitle={"> 50%"} color="green" />
+                    <ReportCard title={t('topDept')} value={reportStats.topDept} subtitle="" color="purple" />
                  </div>
-
-                 {/* Row 2: Charts */}
                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Score Distribution Chart */}
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200" dir="ltr">
-                        <div className="mb-6">
-                           <h3 className={`text-lg font-bold text-slate-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t('scoreDistribution')}</h3>
-                        </div>
+                        <div className="mb-6"><h3 className={`text-lg font-bold text-slate-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t('scoreDistribution')}</h3></div>
                         <div className="h-64 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={reportStats.scoreDistribution}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                    <XAxis dataKey="name" tick={{fontSize: 12}} />
-                                    <YAxis />
-                                    <Tooltip 
-                                        contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} 
-                                        cursor={{fill: '#f8fafc'}}
-                                    />
-                                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                                        {reportStats.scoreDistribution.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                                        ))}
-                                    </Bar>
-                                </BarChart>
-                            </ResponsiveContainer>
+                            <ResponsiveContainer width="100%" height="100%"><BarChart data={reportStats.scoreDistribution}><CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" /><XAxis dataKey="name" tick={{fontSize: 10}} /><YAxis /><Tooltip cursor={{fill: '#f8fafc'}} /><Bar dataKey="count" radius={[4, 4, 0, 0]}>{reportStats.scoreDistribution.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.fill} />))}</Bar></BarChart></ResponsiveContainer>
                         </div>
                     </div>
-
-                    {/* Department Performance Chart */}
                     <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200" dir="ltr">
-                        <div className="mb-6">
-                           <h3 className={`text-lg font-bold text-slate-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t('deptPerformance')}</h3>
-                        </div>
+                        <div className="mb-6"><h3 className={`text-lg font-bold text-slate-800 ${isRTL ? 'text-right' : 'text-left'}`}>{t('deptPerformance')}</h3></div>
                         <div className="h-64 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={reportStats.deptChartData} layout="vertical">
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                    <XAxis type="number" domain={[0, 100]} />
-                                    <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12}} />
-                                    <Tooltip 
-                                        contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} 
-                                        cursor={{fill: '#f8fafc'}}
-                                    />
-                                    <Bar dataKey="avg" fill="#3b82f6" radius={[0, 4, 4, 0]} name={t('score')} />
-                                </BarChart>
-                            </ResponsiveContainer>
+                            <ResponsiveContainer width="100%" height="100%"><BarChart data={reportStats.deptChartData} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" /><XAxis type="number" domain={[0, 100]} /><YAxis dataKey="name" type="category" width={80} tick={{fontSize: 10}} /><Tooltip cursor={{fill: '#f8fafc'}} /><Bar dataKey="avg" fill="#3b82f6" radius={[0, 4, 4, 0]} name={t('score')} /></BarChart></ResponsiveContainer>
                         </div>
                     </div>
                  </div>
-
-                 {/* Row 3: Question Analysis */}
                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                      <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                        <AlertTriangle className="w-5 h-5 text-amber-500" />
-                        {t('questionAnalysis')}
-                      </h3>
-                      <span className="text-xs text-slate-400 font-medium bg-white px-2 py-1 rounded border border-slate-200">
-                          {t('questionsCount')}: {formatNumber(reportStats.questionAnalysisData.length)}
-                      </span>
-                    </div>
+                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center"><h3 className="font-bold text-slate-800 flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-amber-500" />{t('questionAnalysis')}</h3><span className="text-xs text-slate-400 font-medium">{t('questionsCount')}: {formatNumber(reportStats.questionAnalysisData.length)}</span></div>
                     <div className="overflow-x-auto max-h-[400px]">
                       <table className="min-w-full divide-y divide-slate-100">
                          <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
-                            <tr>
-                                <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase w-12">#</th>
-                                <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('questionText')}</th>
-                                <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase w-32">{t('correctRate')}</th>
-                                <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase w-32">{t('studentsCount')}</th>
-                            </tr>
+                            <tr><th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase w-12">#</th><th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('questionText')}</th><th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase w-32">{t('correctRate')}</th><th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase w-32 whitespace-nowrap">{t('studentsCount')}</th></tr>
                          </thead>
                          <tbody className="bg-white divide-y divide-slate-100">
                             {reportStats.questionAnalysisData.map((q, idx) => (
-                                <tr key={q.id} className="hover:bg-slate-50">
-                                    <td className="px-6 py-3 text-sm font-bold text-slate-400">{formatNumber(idx + 1)}</td>
-                                    <td className="px-6 py-3 text-sm text-slate-700">
-                                        <div className="line-clamp-2">{q.text}</div>
-                                        <div className="text-xs text-slate-400 mt-1 flex gap-2">
-                                            <span>{t('correctAnswer')}: <b className="text-green-600">{q.correctAnswer}</b></span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-3">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-sm font-bold ${q.correctRate < 50 ? 'text-red-600' : q.correctRate < 80 ? 'text-yellow-600' : 'text-green-600'}`}>
-                                                {formatNumber(q.correctRate)}%
-                                            </span>
-                                            <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                                <div 
-                                                    className={`h-full rounded-full ${q.correctRate < 50 ? 'bg-red-500' : q.correctRate < 80 ? 'bg-yellow-500' : 'bg-green-500'}`} 
-                                                    style={{width: `${q.correctRate}%`}}
-                                                />
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-3 text-sm text-slate-500 font-mono">
-                                        {formatNumber(q.attempts)}
-                                    </td>
-                                </tr>
+                                <tr key={q.id} className="hover:bg-slate-50"><td className="px-6 py-3 text-sm font-bold text-slate-400">{formatNumber(idx + 1)}</td><td className="px-6 py-3 text-sm text-slate-700"><div className="line-clamp-2">{q.text}</div><div className="text-xs text-slate-400 mt-1">{t('correctAnswer')}: <b className="text-green-600">{q.correctAnswer}</b></div></td><td className="px-6 py-3"><div className="flex items-center gap-2"><span className={`text-sm font-bold ${q.correctRate < 50 ? 'text-red-600' : q.correctRate < 80 ? 'text-yellow-600' : 'text-green-600'}`}>{formatNumber(q.correctRate)}%</span></div></td><td className="px-6 py-3 text-sm text-slate-500 font-mono">{formatNumber(q.attempts)}</td></tr>
                             ))}
                          </tbody>
                       </table>
                     </div>
                  </div>
-                 
-                 {/* Row 4: Detailed List */}
                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-                      <h3 className="font-bold text-slate-800">{t('detailedResults')}</h3>
-                    </div>
+                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50"><h3 className="font-bold text-slate-800">{t('detailedResults')}</h3></div>
                     <div className="overflow-x-auto max-h-[500px]">
                       <table className="min-w-full divide-y divide-slate-100">
                         <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
-                          <tr>
-                             <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('staffName')}</th>
-                             <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('department')}</th>
-                             <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('score')}</th>
-                             <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('status')}</th>
-                             <th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('completionDate')}</th>
-                             <th className="px-6 py-3 text-end text-xs font-bold text-slate-500 uppercase">{t('actions')}</th>
-                          </tr>
+                          <tr><th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('staffName')}</th><th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('department')}</th><th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('score')}</th><th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase">{t('status')}</th><th className="px-6 py-3 text-start text-xs font-bold text-slate-500 uppercase whitespace-nowrap">{t('completionDate')}</th><th className="px-6 py-3 text-end text-xs font-bold text-slate-500 uppercase">{t('actions')}</th></tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-slate-100">
                            {reportStats.allParticipants.map(u => {
                              const p = u.participations![reportQuizId];
                              const percentage = Math.round((p.score / p.totalQuestions) * 100);
                              const isComplete = p.answers && p.totalQuestions && Object.keys(p.answers).length === p.totalQuestions;
-
                              return (
                                <tr key={u.id} className="hover:bg-slate-50">
                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-900 text-start">{u.name}</td>
                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 text-start">{u.department}</td>
-                                 <td className="px-6 py-4 whitespace-nowrap text-start">
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-16 bg-slate-100 rounded-full h-2 overflow-hidden">
-                                        <div className={`h-full rounded-full ${percentage >= 70 ? 'bg-green-500' : percentage >= 40 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${percentage}%` }}></div>
-                                      </div>
-                                      <span className="text-sm font-bold text-slate-700">{formatNumber(p.score)} / {formatNumber(p.totalQuestions)}</span>
-                                    </div>
-                                 </td>
-                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-start">
-                                    {isComplete ? (
-                                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">{t('completed')}</span>
-                                    ) : (
-                                      <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-bold">{t('inProgress')}</span>
-                                    )}
-                                 </td>
+                                 <td className="px-6 py-4 whitespace-nowrap text-start"><div className="flex items-center gap-3"><span className="text-sm font-bold text-slate-700">{formatNumber(p.score)} / {formatNumber(p.totalQuestions)}</span></div></td>
+                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-start">{isComplete ? (<span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-bold">{t('completed')}</span>) : (<span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-bold">{t('inProgress')}</span>)}</td>
                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-400 font-mono text-xs text-start">{new Date(p.completedAt).toLocaleDateString(isRTL ? 'ar-SA' : 'en-US')}</td>
-                                 <td className="px-6 py-4 whitespace-nowrap text-end text-sm">
-                                    <button 
-                                      onClick={() => handleResetProgress(u.id)}
-                                      className="text-slate-300 hover:text-red-600 transition-all p-2 rounded-full hover:bg-red-50"
-                                      title={t('reset')}
-                                    >
-                                       <RotateCcw className="w-4 h-4" />
-                                    </button>
-                                 </td>
+                                 <td className="px-6 py-4 whitespace-nowrap text-end text-sm"><button onClick={() => handleResetProgress(u.id)} className="text-slate-300 hover:text-red-600 p-2 rounded-full hover:bg-red-50" title={t('reset')}><RotateCcw className="w-4 h-4" /></button></td>
                                </tr>
                              );
                            })}
-                           {reportStats.allParticipants.length === 0 && (
-                             <tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">{t('noParticipation')}</td></tr>
-                           )}
+                           {reportStats.allParticipants.length === 0 && (<tr><td colSpan={6} className="px-6 py-12 text-center text-slate-400">{t('noParticipation')}</td></tr>)}
                         </tbody>
                       </table>
                     </div>
                  </div>
               </div>
-            ) : (
-              <div className="text-center py-24 bg-white rounded-3xl border border-dashed border-slate-200">
-                <p className="text-slate-400">{t('selectAssessment')}</p>
-              </div>
-            )}
+            ) : (<div className="text-center py-20 bg-white rounded-3xl border border-dashed border-slate-200"><p className="text-slate-400">{t('selectAssessment')}</p></div>)}
           </div>
         )}
       </main>
       <Footer />
-
       {/* --- MODALS --- */}
-      
-      {/* Confirmation Modal */}
       {confirmModal.isOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 animate-in zoom-in-95 duration-200 border border-white/20">
-            <div className="flex items-start gap-4 mb-4">
-              <div className="bg-red-100 p-3 rounded-full flex-shrink-0">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">{confirmModal.title}</h3>
-                <p className="text-sm text-slate-600 mt-1 leading-relaxed">{confirmModal.message}</p>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <button 
-                onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
-                className="px-4 py-2.5 text-slate-700 hover:bg-slate-100 rounded-xl text-sm font-semibold transition-colors"
-              >
-                {t('cancel')}
-              </button>
-              <button 
-                onClick={confirmModal.onConfirm}
-                className="px-4 py-2.5 bg-red-600 text-white hover:bg-red-700 rounded-xl text-sm font-semibold transition-colors shadow-lg shadow-red-500/20"
-              >
-                {t('delete')}
-              </button>
-            </div>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <div className="flex items-start gap-4 mb-4"><div className="bg-red-100 p-3 rounded-full flex-shrink-0"><AlertTriangle className="w-6 h-6 text-red-600" /></div><div><h3 className="text-lg font-bold text-slate-900">{confirmModal.title}</h3><p className="text-sm text-slate-600 mt-1 leading-relaxed">{confirmModal.message}</p></div></div>
+            <div className="flex justify-end gap-3 mt-6"><button onClick={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} className="px-4 py-2 text-slate-700 hover:bg-slate-100 rounded-xl text-sm font-semibold">{t('cancel')}</button><button onClick={confirmModal.onConfirm} className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-xl text-sm font-semibold shadow-lg shadow-red-500/20">{t('delete')}</button></div>
           </div>
         </div>
       )}
-      
-      {/* Create Quiz Modal */}
       {showCreateQuizModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in slide-in-from-bottom-8">
-             <div className="flex justify-between items-center mb-6">
-               <h3 className="text-xl font-bold text-slate-800">{t('createQuiz')}</h3>
-               <button onClick={() => setShowCreateQuizModal(false)} className="p-1 hover:bg-slate-100 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
-             </div>
-             <form onSubmit={handleCreateQuiz}>
-               <div className="mb-5">
-                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('quizTitle')}</label>
-                 <input 
-                   autoFocus 
-                   type="text" 
-                   className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-slate-800 bg-white" 
-                   value={newQuizTitle} 
-                   onChange={e => setNewQuizTitle(e.target.value)} 
-                   required 
-                 />
-               </div>
-               
-               <div className="mb-8 flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100">
-                 <input 
-                    type="checkbox" 
-                    id="newQuizActive"
-                    checked={newQuizActive}
-                    onChange={(e) => setNewQuizActive(e.target.checked)}
-                    className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 border-gray-300 bg-white"
-                 />
-                 <label htmlFor="newQuizActive" className="text-sm text-slate-700 font-medium cursor-pointer select-none">{t('makeActive')}</label>
-               </div>
-
-               <div className="flex justify-end gap-3">
-                 <button type="button" onClick={() => setShowCreateQuizModal(false)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition-colors">{t('cancel')}</button>
-                 <button type="submit" className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-lg shadow-blue-500/20 transition-transform active:scale-95">{t('createQuiz')}</button>
-               </div>
-             </form>
-          </div>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"><div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-800">{t('createQuiz')}</h3><button onClick={() => setShowCreateQuizModal(false)}><X className="w-5 h-5 text-slate-400" /></button></div><form onSubmit={handleCreateQuiz}><div className="mb-5"><label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('quizTitle')}</label><input autoFocus type="text" className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none" value={newQuizTitle} onChange={e => setNewQuizTitle(e.target.value)} required /></div><div className="mb-8 flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-100"><input type="checkbox" id="newQuizActive" checked={newQuizActive} onChange={(e) => setNewQuizActive(e.target.checked)} className="w-5 h-5 rounded" /><label htmlFor="newQuizActive" className="text-sm text-slate-700 font-medium cursor-pointer">{t('makeActive')}</label></div><div className="flex justify-end gap-3"><button type="button" onClick={() => setShowCreateQuizModal(false)} className="px-5 py-2.5 text-slate-600">{t('cancel')}</button><button type="submit" className="px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20">{t('createQuiz')}</button></div></form></div>
         </div>
       )}
-
-      {/* Add/Edit User Modal */}
       {showUserModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 animate-in slide-in-from-bottom-8">
-             <div className="flex justify-between items-center mb-6">
-               <h3 className="text-xl font-bold text-slate-800">{editingUser ? t('edit') : t('addStaff')}</h3>
-               <button onClick={() => setShowUserModal(false)} className="p-1 hover:bg-slate-100 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
-             </div>
-             <form onSubmit={handleSaveUser} className="space-y-4">
-               <div>
-                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('staffName')}</label>
-                 <input type="text" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 bg-white" placeholder="John Doe" value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} required />
-               </div>
-               <div>
-                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('employeeId')}</label>
-                 <input type="text" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 bg-white" placeholder="EMP-001" value={userData.employeeId} onChange={e => setUserData({...userData, employeeId: e.target.value})} required />
-               </div>
-               <div>
-                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('department')}</label>
-                 <input type="text" className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 bg-white" placeholder="IT Dept" value={userData.department} onChange={e => setUserData({...userData, department: e.target.value})} required />
-               </div>
-               <div className="flex justify-end gap-3 mt-8">
-                 <button type="button" onClick={() => setShowUserModal(false)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition-colors">{t('cancel')}</button>
-                 <button type="submit" className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-lg shadow-blue-500/20">{t('save')}</button>
-               </div>
-             </form>
-           </div>
+           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"><div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-800">{editingUser ? t('edit') : t('addStaff')}</h3><button onClick={() => setShowUserModal(false)}><X className="w-5 h-5 text-slate-400" /></button></div><form onSubmit={handleSaveUser} className="space-y-4"><div><label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('staffName')}</label><input type="text" className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none" value={userData.name} onChange={e => setUserData({...userData, name: e.target.value})} required /></div><div><label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('employeeId')}</label><input type="text" className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none" value={userData.employeeId} onChange={e => setUserData({...userData, employeeId: e.target.value})} required /></div><div><label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('department')}</label><input type="text" className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none" value={userData.department} onChange={e => setUserData({...userData, department: e.target.value})} required /></div><div className="flex justify-end gap-3 mt-8"><button type="button" onClick={() => setShowUserModal(false)} className="px-5 py-2.5 text-slate-600">{t('cancel')}</button><button type="submit" className="px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-500/20">{t('save')}</button></div></form></div>
         </div>
       )}
-
-      {/* Add/Edit Question Modal */}
       {showQuestionModal && (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 my-8 animate-in zoom-in-95">
-             <div className="flex justify-between items-center mb-6">
-               <h3 className="text-xl font-bold text-slate-800">{editingQuestion ? t('edit') : t('addQuestion')}</h3>
-               <button onClick={() => setShowQuestionModal(false)} className="p-1 hover:bg-slate-100 rounded-full transition-colors"><X className="w-5 h-5 text-slate-400" /></button>
-             </div>
-             <form onSubmit={handleSaveQuestion} className="space-y-5">
-               <div>
-                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('questionText')}</label>
-                 <textarea className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-slate-900 bg-white" rows={3} placeholder="What is the..." value={questionData.text} onChange={e => setQuestionData({...questionData, text: e.target.value})} required />
-               </div>
-               <div className="grid grid-cols-1 gap-4">
-                  {(['A', 'B', 'C', 'D'] as const).map(opt => (
-                    <div key={opt} className="relative">
-                      <span className={`absolute ${isRTL ? 'right-4' : 'left-4'} top-3.5 text-xs font-bold text-slate-400`}>{t('option')} {opt}</span>
-                      <input type="text" className={`w-full ${isRTL ? 'pr-20 pl-4' : 'pl-20 pr-4'} py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm font-medium text-slate-900 bg-white`} value={questionData.options[opt]} onChange={e => setQuestionData({...questionData, options: {...questionData.options, [opt]: e.target.value}})} required />
-                    </div>
-                  ))}
-               </div>
-               <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('correctAnswer')}</label>
-                 <div className="flex gap-2">
-                   {(['A', 'B', 'C', 'D'] as const).map(opt => (
-                     <button
-                        type="button"
-                        key={opt}
-                        onClick={() => setQuestionData({...questionData, correctAnswer: opt})}
-                        className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${questionData.correctAnswer === opt ? 'bg-green-500 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'}`}
-                     >
-                       {opt}
-                     </button>
-                   ))}
-                 </div>
-               </div>
-               <div className="flex justify-end gap-3 mt-6">
-                 <button type="button" onClick={() => setShowQuestionModal(false)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition-colors">{t('cancel')}</button>
-                 <button type="submit" className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-lg shadow-blue-500/20">{t('saveQuestion')}</button>
-               </div>
-             </form>
-           </div>
+           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 my-8 animate-in zoom-in-95"><div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-slate-800">{editingQuestion ? t('edit') : t('addQuestion')}</h3><button onClick={() => setShowQuestionModal(false)}><X className="w-5 h-5 text-slate-400" /></button></div><form onSubmit={handleSaveQuestion} className="space-y-5"><div><label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('questionText')}</label><textarea className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none" rows={3} value={questionData.text} onChange={e => setQuestionData({...questionData, text: e.target.value})} required /></div><div className="grid grid-cols-1 gap-4">{(['A', 'B', 'C', 'D'] as const).map(opt => (<div key={opt} className="relative"><span className={`absolute ${isRTL ? 'right-4' : 'left-4'} top-3.5 text-[10px] font-bold text-slate-400 uppercase`}>{t('option')} {opt}</span><input type="text" className={`w-full ${isRTL ? 'pr-20 pl-4' : 'pl-20 pr-4'} py-3 border border-slate-200 rounded-xl outline-none text-sm font-medium`} value={questionData.options[opt]} onChange={e => setQuestionData({...questionData, options: {...questionData.options, [opt]: e.target.value}})} required /></div>))}</div><div className="bg-slate-50 p-4 rounded-xl border border-slate-100"><label className="block text-xs font-bold text-slate-500 uppercase mb-2">{t('correctAnswer')}</label><div className="flex gap-2">{(['A', 'B', 'C', 'D'] as const).map(opt => (<button type="button" key={opt} onClick={() => setQuestionData({...questionData, correctAnswer: opt})} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${questionData.correctAnswer === opt ? 'bg-green-500 text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600'}`}>{opt}</button>))}</div></div><div className="flex justify-end gap-3 mt-6"><button type="button" onClick={() => setShowQuestionModal(false)} className="px-5 py-2.5 text-slate-600">{t('cancel')}</button><button type="submit" className="px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold">{t('saveQuestion')}</button></div></form></div>
         </div>
       )}
-
     </div>
   );
 };
 
 const NavButton = ({ active, onClick, children, icon }: { active: boolean, onClick: () => void, children?: React.ReactNode, icon: React.ReactNode }) => (
-  <button 
-    onClick={onClick} 
-    className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2 flex-1 md:flex-none justify-center ${active ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
-  >
-    {icon}
-    {children}
+  <button onClick={onClick} className={`px-4 py-2.5 rounded-lg text-[11px] md:text-sm font-bold transition-all flex items-center gap-2 flex-1 md:flex-none justify-center whitespace-nowrap ${active ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+    {icon} {children}
   </button>
 );
 
-// Simple KPI Card Component
 const ReportCard = ({ title, value, subtitle, color }: { title: string, value: string, subtitle: string, color: string }) => {
     const { isRTL } = useLanguage();
-    
-    // Color mapping
-    const colorClasses: Record<string, string> = {
-        indigo: 'from-indigo-500 to-indigo-600',
-        blue: 'from-blue-500 to-blue-600',
-        green: 'from-green-500 to-emerald-600',
-        purple: 'from-purple-500 to-fuchsia-600',
-    };
-    
+    const colorClasses: Record<string, string> = { indigo: 'from-indigo-500 to-indigo-600', blue: 'from-blue-500 to-blue-600', green: 'from-green-500 to-emerald-600', purple: 'from-purple-500 to-fuchsia-600' };
     return (
-        <div className={`bg-gradient-to-br ${colorClasses[color] || colorClasses.blue} p-5 rounded-2xl shadow-lg text-white relative overflow-hidden`}>
-            <div className="relative z-10">
-                <h3 className="text-white/80 text-xs font-bold uppercase tracking-wider">{title}</h3>
-                <div className="mt-2 flex flex-col">
-                    <span className="text-3xl font-bold tracking-tight">{value}</span>
-                    {subtitle && <span className="text-xs text-white/70 mt-1 font-medium">{subtitle}</span>}
-                </div>
-            </div>
-            {/* Decorative blob */}
-            <div className={`absolute ${isRTL ? '-left-6' : '-right-6'} -bottom-6 w-24 h-24 bg-white/10 rounded-full blur-2xl`}></div>
+        <div className={`bg-gradient-to-br ${colorClasses[color] || colorClasses.blue} p-4 md:p-5 rounded-2xl shadow-lg text-white relative overflow-hidden`}>
+            <div className="relative z-10"><h3 className="text-white/80 text-[10px] md:text-xs font-bold uppercase tracking-wider">{title}</h3><div className="mt-2 flex flex-col"><span className="text-xl md:text-3xl font-bold tracking-tight">{value}</span>{subtitle && <span className="text-[10px] text-white/70 mt-1 font-medium">{subtitle}</span>}</div></div>
+            <div className={`absolute ${isRTL ? '-left-6' : '-right-6'} -bottom-6 w-20 h-20 md:w-24 md:h-24 bg-white/10 rounded-full blur-2xl`}></div>
         </div>
     );
 };
