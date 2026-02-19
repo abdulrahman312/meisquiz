@@ -12,6 +12,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { parseUsersExcel, parseQuestionsExcel, exportReportsToExcel, downloadUserTemplate, downloadQuestionTemplate } from '../services/excelService';
 import { QuizUser, Question, Quiz } from '../types';
 import { Footer } from './Footer';
+import { triggerHaptic } from '../services/hapticService';
 
 type Tab = 'users' | 'quiz' | 'reports';
 
@@ -123,10 +124,12 @@ export const AdminDashboard: React.FC = () => {
           participations: {}
         });
       }
+      triggerHaptic('success');
       setShowUserModal(false);
       setUserData({ name: '', employeeId: '', department: '' });
       await fetchUsers();
     } catch (error) {
+      triggerHaptic('error');
       alert("Error saving user");
     } finally {
       setLoading(false);
@@ -148,9 +151,11 @@ export const AdminDashboard: React.FC = () => {
         });
         await batch.commit();
         await fetchUsers();
+        triggerHaptic('success');
         alert(`Successfully imported ${parsed.length} users.`);
       }
     } catch (err) {
+      triggerHaptic('error');
       alert("Import failed. Please check the Excel file format.");
     } finally {
       setLoading(false);
@@ -159,6 +164,7 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleDeleteUser = (id: string) => {
+    triggerHaptic('warning');
     setConfirmModal({
       isOpen: true,
       title: t('confirmDelete'),
@@ -167,9 +173,11 @@ export const AdminDashboard: React.FC = () => {
         try {
           await db.collection('users').doc(id).delete();
           setUsers(prev => prev.filter(u => u.id !== id));
+          triggerHaptic('heavy');
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         } catch (error: any) {
           console.error("Delete user error:", error);
+          triggerHaptic('error');
         }
       }
     });
@@ -184,17 +192,20 @@ export const AdminDashboard: React.FC = () => {
         isActive: newQuizActive,
         createdAt: Date.now()
       });
+      triggerHaptic('success');
       setShowCreateQuizModal(false);
       setNewQuizTitle('');
       setNewQuizActive(false);
       await fetchQuizzes();
     } catch (error) {
+      triggerHaptic('error');
       alert("Error creating quiz");
     }
   };
 
   const handleToggleQuizStatus = async (quiz: Quiz) => {
     try {
+      triggerHaptic('medium');
       await db.collection('quizzes').doc(quiz.id).update({ isActive: !quiz.isActive });
       setQuizzes(quizzes.map(q => q.id === quiz.id ? { ...q, isActive: !q.isActive } : q));
     } catch (error) {
@@ -212,12 +223,14 @@ export const AdminDashboard: React.FC = () => {
       setSelectedQuiz(updated);
       setQuizzes(prev => prev.map(q => q.id === updated.id ? updated : q));
       setIsEditingTitle(false);
+      triggerHaptic('success');
     } catch (error) {
       console.error("Error updating title:", error);
     }
   };
 
   const handleDeleteQuiz = (id: string) => {
+    triggerHaptic('warning');
     setConfirmModal({
       isOpen: true,
       title: t('confirmDelete'),
@@ -227,15 +240,18 @@ export const AdminDashboard: React.FC = () => {
           await db.collection('quizzes').doc(id).delete();
           setQuizzes(prev => prev.filter(q => q.id !== id));
           if (selectedQuiz?.id === id) setSelectedQuiz(null);
+          triggerHaptic('heavy');
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         } catch (error: any) {
           console.error("Delete quiz error:", error);
+          triggerHaptic('error');
         }
       }
     });
   };
 
   const selectQuiz = async (quiz: Quiz) => {
+    triggerHaptic('selection');
     setSelectedQuiz(quiz);
     setIsEditingTitle(false);
     await fetchQuestions(quiz.id);
@@ -256,11 +272,13 @@ export const AdminDashboard: React.FC = () => {
            order
          });
       }
+      triggerHaptic('success');
       setShowQuestionModal(false);
       setQuestionData({ text: '', options: { A: '', B: '', C: '', D: '' }, correctAnswer: 'A' });
       await fetchQuestions(selectedQuiz.id);
     } catch (error) {
       alert("Error saving question");
+      triggerHaptic('error');
     }
   };
 
@@ -279,10 +297,12 @@ export const AdminDashboard: React.FC = () => {
         });
         await batch.commit();
         await fetchQuestions(selectedQuiz.id);
+        triggerHaptic('success');
         alert(`Successfully imported ${parsed.length} questions.`);
       }
     } catch (err) {
       console.error(err);
+      triggerHaptic('error');
     } finally {
       setLoading(false);
       e.target.value = ''; 
@@ -291,6 +311,7 @@ export const AdminDashboard: React.FC = () => {
 
   const handleDeleteQuestion = (qId: string) => {
     if (!selectedQuiz) return;
+    triggerHaptic('warning');
     setConfirmModal({
       isOpen: true,
       title: t('confirmDelete'),
@@ -299,33 +320,39 @@ export const AdminDashboard: React.FC = () => {
         try {
           await db.collection('quizzes').doc(selectedQuiz.id).collection('questions').doc(qId).delete();
           setQuizQuestions(prev => prev.filter(q => q.id !== qId));
+          triggerHaptic('heavy');
           setConfirmModal(prev => ({ ...prev, isOpen: false }));
         } catch (error: any) {
           console.error("Delete question error:", error);
+          triggerHaptic('error');
         }
       }
     });
   };
 
   const openAddUserModal = () => {
+    triggerHaptic('selection');
     setEditingUser(null);
     setUserData({ name: '', employeeId: '', department: '' });
     setShowUserModal(true);
   };
 
   const openEditUserModal = (u: QuizUser) => {
+    triggerHaptic('selection');
     setEditingUser(u);
     setUserData({ name: u.name, employeeId: u.employeeId, department: u.department });
     setShowUserModal(true);
   };
 
   const openAddQuestionModal = () => {
+    triggerHaptic('selection');
     setEditingQuestion(null);
     setQuestionData({ text: '', options: { A: '', B: '', C: '', D: '' }, correctAnswer: 'A' });
     setShowQuestionModal(true);
   };
 
   const openEditQuestionModal = (q: Question) => {
+    triggerHaptic('selection');
     setEditingQuestion(q);
     setQuestionData({ text: q.text, options: { ...q.options }, correctAnswer: q.correctAnswer });
     setShowQuestionModal(true);
@@ -388,6 +415,7 @@ export const AdminDashboard: React.FC = () => {
 
   const handleExportReport = () => {
     if (!reportStats) return;
+    triggerHaptic('selection');
     const data = users.map(u => {
       const part = u.participations?.[reportQuizId];
       const isComplete = part && part.answers && part.totalQuestions && Object.keys(part.answers).length === part.totalQuestions;
@@ -397,6 +425,7 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleResetProgress = (userId: string) => {
+    triggerHaptic('warning');
     setConfirmModal({
         isOpen: true,
         title: t('resetConfirmTitle'),
@@ -412,10 +441,21 @@ export const AdminDashboard: React.FC = () => {
                     }
                     return u;
                 }));
+                triggerHaptic('heavy');
                 setConfirmModal(prev => ({ ...prev, isOpen: false }));
             } catch (error) { console.error(error); }
         }
     });
+  };
+  
+  const handleTabChange = (tab: Tab) => {
+    triggerHaptic('selection');
+    setActiveTab(tab);
+  };
+  
+  const handleLogout = () => {
+    triggerHaptic('medium');
+    logout();
   };
 
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
@@ -439,7 +479,7 @@ export const AdminDashboard: React.FC = () => {
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="hidden lg:block text-slate-400 font-bold text-[10px] tracking-wider uppercase">{t('adminPortal')}</span>
               <button 
-                onClick={() => logout()} 
+                onClick={handleLogout} 
                 className="flex items-center gap-1.5 px-2.5 py-1.5 md:px-3 md:py-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-slate-100 hover:border-red-100 bg-slate-50/50 md:bg-transparent" 
                 title={t('logout')}
               >
@@ -452,9 +492,9 @@ export const AdminDashboard: React.FC = () => {
           {/* Bottom Header Row - Navigation Tabs */}
           <div className="pb-3 md:pb-4 overflow-x-auto scrollbar-hide">
             <div className="flex bg-slate-100 p-1 rounded-xl w-full min-w-max md:min-w-0">
-              <NavButton active={activeTab === 'quiz'} onClick={() => setActiveTab('quiz')} icon={<CheckSquare className="w-4 h-4" />}>{t('manageQuizzes')}</NavButton>
-              <NavButton active={activeTab === 'users'} onClick={() => setActiveTab('users')} icon={<Users className="w-4 h-4" />}>{t('manageStaff')}</NavButton>
-              <NavButton active={activeTab === 'reports'} onClick={() => setActiveTab('reports')} icon={<LayoutDashboard className="w-4 h-4" />}>{t('reports')}</NavButton>
+              <NavButton active={activeTab === 'quiz'} onClick={() => handleTabChange('quiz')} icon={<CheckSquare className="w-4 h-4" />}>{t('manageQuizzes')}</NavButton>
+              <NavButton active={activeTab === 'users'} onClick={() => handleTabChange('users')} icon={<Users className="w-4 h-4" />}>{t('manageStaff')}</NavButton>
+              <NavButton active={activeTab === 'reports'} onClick={() => handleTabChange('reports')} icon={<LayoutDashboard className="w-4 h-4" />}>{t('reports')}</NavButton>
             </div>
           </div>
         </div>
@@ -470,7 +510,10 @@ export const AdminDashboard: React.FC = () => {
                     <h2 className="text-2xl font-bold text-slate-800">{t('manageQuizzes')}</h2>
                   </div>
                   <button 
-                    onClick={() => setShowCreateQuizModal(true)}
+                    onClick={() => {
+                        triggerHaptic('medium');
+                        setShowCreateQuizModal(true);
+                    }}
                     className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2 transition-all transform active:scale-95"
                   >
                     <Plus className="w-5 h-5" /> {t('createQuiz')}
@@ -510,7 +553,15 @@ export const AdminDashboard: React.FC = () => {
               </div>
             ) : (
               <div className={`animate-in ${isRTL ? 'slide-in-from-left-4' : 'slide-in-from-right-4'} duration-300`}>
-                <button onClick={() => setSelectedQuiz(null)} className="mb-6 text-sm text-slate-500 hover:text-slate-900 flex items-center gap-1 font-medium transition-colors"><BackIcon className="w-4 h-4" /> {t('back')}</button>
+                <button 
+                  onClick={() => {
+                      triggerHaptic('light');
+                      setSelectedQuiz(null);
+                  }} 
+                  className="mb-6 text-sm text-slate-500 hover:text-slate-900 flex items-center gap-1 font-medium transition-colors"
+                >
+                  <BackIcon className="w-4 h-4" /> {t('back')}
+                </button>
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6">
                   <div className="p-6 md:p-8 border-b border-slate-100 flex flex-col xl:flex-row xl:justify-between xl:items-center gap-6">
                     <div className="flex-1">

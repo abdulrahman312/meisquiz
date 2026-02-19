@@ -6,6 +6,7 @@ import { db } from '../firebase';
 import { Question, QuizUser, Quiz, QuizAttempt } from '../types';
 import { CheckCircle, XCircle, LogOut, ChevronDown, ChevronUp, Trophy, ArrowLeft, ArrowRight, PlayCircle, Clock, Award, Circle, Save, HelpCircle, AlertCircle } from 'lucide-react';
 import { Footer } from './Footer';
+import { triggerHaptic } from '../services/hapticService';
 
 export const EmployeeDashboard: React.FC = () => {
   const { user, logout } = useAuth();
@@ -42,7 +43,10 @@ export const EmployeeDashboard: React.FC = () => {
 
   const handleAnswer = async (questionId: string, answer: string, correct: string) => {
     if (!user?.uid || !selectedQuiz) return;
+    
     const isCorrect = answer === correct;
+    triggerHaptic(isCorrect ? 'success' : 'error');
+
     const currentPart = getParticipation(selectedQuiz.id) || { score: 0, totalQuestions: currentQuestions.length, completedAt: 0, answers: {} };
     const newAnswers: QuizAttempt['answers'] = { ...currentPart.answers, [questionId]: { selectedAnswer: answer, isCorrect } };
     const score = Object.values(newAnswers).filter(a => a.isCorrect).length;
@@ -56,6 +60,11 @@ export const EmployeeDashboard: React.FC = () => {
     return ans.isCorrect ? 'correct' : 'wrong';
   };
 
+  const handleLogout = () => {
+    triggerHaptic('medium');
+    logout();
+  };
+
   const ArrowIcon = isRTL ? ArrowLeft : ArrowRight;
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
 
@@ -67,7 +76,15 @@ export const EmployeeDashboard: React.FC = () => {
             {/* Branding - constrained width for mobile safety */}
             <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0 max-w-[70%]">
                {selectedQuiz ? (
-                 <button onClick={() => setSelectedQuiz(null)} className={`p-2 ${isRTL ? '-mr-2' : '-ml-2'} text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all flex-shrink-0`}><BackIcon className="w-5 h-5 md:w-6 md:h-6" /></button>
+                 <button 
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setSelectedQuiz(null);
+                  }} 
+                  className={`p-2 ${isRTL ? '-mr-2' : '-ml-2'} text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition-all flex-shrink-0`}
+                 >
+                   <BackIcon className="w-5 h-5 md:w-6 md:h-6" />
+                 </button>
                ) : (
                  <img src="https://i.ibb.co/bgFrgXkW/meis.png" alt="Logo" className="w-9 h-9 md:w-14 md:h-14 flex-shrink-0" />
                )}
@@ -79,7 +96,7 @@ export const EmployeeDashboard: React.FC = () => {
             {/* Logout - strictly visible container */}
             <div className="flex-shrink-0">
               <button 
-                onClick={() => logout()} 
+                onClick={handleLogout} 
                 className="flex items-center gap-1 px-2 py-1.5 md:px-3 md:py-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-slate-100 hover:border-red-100 bg-slate-50 md:bg-transparent shadow-sm md:shadow-none"
               >
                 <LogOut className="w-4 h-4 md:w-5 md:h-5" />
@@ -120,7 +137,14 @@ export const EmployeeDashboard: React.FC = () => {
                 const isCompleted = isStarted && answered >= total && total > 0;
                 const percentage = isStarted && total > 0 ? Math.round((answered / total) * 100) : 0;
                 return (
-                  <button key={quiz.id} onClick={() => setSelectedQuiz(quiz)} className="bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-blue-200 transition-all text-start flex flex-col h-full overflow-hidden group">
+                  <button 
+                    key={quiz.id} 
+                    onClick={() => {
+                      triggerHaptic('medium');
+                      setSelectedQuiz(quiz);
+                    }} 
+                    className="bg-white rounded-2xl shadow-sm border border-slate-100 hover:border-blue-200 transition-all text-start flex flex-col h-full overflow-hidden group"
+                  >
                     <div className="p-5 flex-1 w-full">
                       <div className="flex justify-between items-start mb-4">
                         <div className={`p-2.5 rounded-xl ${isCompleted ? 'bg-green-100 text-green-600' : isStarted ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-500'}`}>{isCompleted ? <CheckCircle className="w-5 h-5" /> : isStarted ? <Clock className="w-5 h-5" /> : <Circle className="w-5 h-5" />}</div>
@@ -166,7 +190,13 @@ export const EmployeeDashboard: React.FC = () => {
                   const isOpen = expandedId === q.id || (status === 'pending' && expandedId === null && idx === 0);
                   return (
                     <div key={q.id} className={`bg-white rounded-xl shadow-sm border transition-all ${isOpen ? 'border-blue-200 ring-1 ring-blue-50' : 'border-slate-100'}`}>
-                      <button onClick={() => setExpandedId(isOpen ? null : q.id)} className="w-full p-4 flex items-start gap-3 text-start">
+                      <button 
+                        onClick={() => {
+                          triggerHaptic('selection');
+                          setExpandedId(isOpen ? null : q.id);
+                        }} 
+                        className="w-full p-4 flex items-start gap-3 text-start"
+                      >
                         <div className="shrink-0 mt-0.5">{status==='correct'?<CheckCircle className="w-5 h-5 text-green-500"/>:status==='wrong'?<XCircle className="w-5 h-5 text-red-500"/>:<div className="w-6 h-6 rounded-full bg-slate-100 text-slate-400 text-[10px] font-bold flex items-center justify-center border border-slate-200">{formatNumber(idx+1)}</div>}</div>
                         <span className="flex-1 text-sm md:text-base font-semibold text-slate-700 leading-snug">{q.text}</span>
                         <div className="shrink-0 text-slate-300">{isOpen?<ChevronUp className="w-4 h-4"/>:<ChevronDown className="w-4 h-4"/>}</div>

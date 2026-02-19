@@ -1,8 +1,10 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Lock, User, AlertCircle, X, ArrowRight, ShieldCheck, ArrowLeft } from 'lucide-react';
 import { Footer } from './Footer';
+import { triggerHaptic } from '../services/hapticService';
 
 export const Login: React.FC = () => {
   const { loginEmployee, loginAdmin } = useAuth();
@@ -18,13 +20,16 @@ export const Login: React.FC = () => {
 
   const handleEmployeeLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    triggerHaptic('light');
     setError('');
     setIsLoading(true);
     try {
       await loginEmployee(employeeId.trim());
+      triggerHaptic('success');
     } catch (err: any) {
       console.error(err);
       setError(t('employeeError'));
+      triggerHaptic('error');
     } finally {
       setIsLoading(false);
     }
@@ -32,14 +37,17 @@ export const Login: React.FC = () => {
 
   const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    triggerHaptic('light');
     setError('');
     setIsLoading(true);
     try {
       await loginAdmin(adminEmail, adminPass);
+      triggerHaptic('success');
       setShowAdminModal(false);
     } catch (err: any) {
       console.error("Admin Login Error:", err);
       setError(t('adminError'));
+      triggerHaptic('error');
     } finally {
       setIsLoading(false);
     }
@@ -120,6 +128,7 @@ export const Login: React.FC = () => {
             <div className="mt-8 pt-6 border-t border-white/10 flex justify-center">
               <button 
                 onClick={() => {
+                  triggerHaptic('selection');
                   setShowAdminModal(true);
                   setError('');
                 }}
@@ -138,6 +147,7 @@ export const Login: React.FC = () => {
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 relative animate-in zoom-in-95 duration-200">
               <button 
                 onClick={() => {
+                  triggerHaptic('selection');
                   setShowAdminModal(false);
                   setError('');
                 }}
